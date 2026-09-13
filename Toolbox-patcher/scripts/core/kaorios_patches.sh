@@ -47,7 +47,7 @@ inject_kaorios_utility_classes() {
     return 0
 }
 
-# apply_kaorios_toolbox_patches <decompile_dir> <sdk> <json> <dry_run> <profile> <artifact>
+# apply_kaorios_toolbox_patches <decompile_dir> <sdk> <json> <dry_run> <profile> <artifact> <verify>
 apply_kaorios_toolbox_patches() {
     local decompile_dir="$1"
     local sdk="${2:-}"
@@ -55,6 +55,7 @@ apply_kaorios_toolbox_patches() {
     local dry_run="${4:-0}"
     local profile="${5:-legacy}"
     local artifact="${6:-framework}"
+    local verify="${7:-1}"
 
     log "========================================="
     log "Applying Kaorios Toolbox patches ($profile / $artifact)"
@@ -64,6 +65,33 @@ apply_kaorios_toolbox_patches() {
         inject_kaorios_utility_classes "$decompile_dir" || return 1
     elif [ "$profile" = "legacy" ] && [ "$artifact" = "framework" ]; then
         log "Dry run: skipping hook class injection"
+    fi
+
+    # Static link check: every hook method a snippet calls must actually be
+    # declared in the tree. Without this, a payload whose signatures changed
+    # produces a framework that assembles cleanly and then dies at boot with
+    # NoSuchMethodError.
+    if [ "$verify" != "0" ]; then
+        if ! kaorios_engine verify \
+            --decompile-dir "$(kaorios_native_path "$decompile_dir")" \
+            --profile "$profile" --artifact "$artifact"; then
+            if [ "$dry_run" = "1" ]; then
+                # Expected: a dry run does not inject the hook classes, so they
+                # cannot resolve yet. Advisory only.
+                warn "Hook contract check failed — expected during a dry run, since"
+                warn "the hook classes are not injected. Continuing."
+            else
+                err "Hook contract check failed: a hook class or method the patcher calls"
+                err "is not present in this tree."
+                err "  legacy: run scripts/update_kaorios.sh to refresh the hook classes."
+                err "  modern: supply the android.security.kaorios payload from the"
+                err "          V2.0.3+ release."
+                err "Re-run with --no-verify-hooks to patch anyway."
+                return 1
+            fi
+        fi
+    else
+        warn "Skipping hook contract check (--no-verify-hooks)"
     fi
 
     local args=(patch --decompile-dir "$(kaorios_native_path "$decompile_dir")" --profile "$profile" --artifact "$artifact")

@@ -81,6 +81,14 @@ LEGACY_FEATURE_OVERRIDES = f"L{LEGACY_PACKAGE}/KaoriFeatureOverrides;"
 # modern class. Supplied by the V2.0.3+ release, not by this repository.
 MODERN_HOOK = "Landroid/security/kaorios/KaoriosHook;"
 
+# Namespaces the patch table is allowed to call into. Everything else a snippet
+# references (Ljava/lang/Boolean;, Landroid/app/ActivityThread;, ...) lives in
+# other jars and cannot be checked here.
+LEGACY_NAMESPACE = LEGACY_PATH
+MODERN_NAMESPACE = "android/security/kaorios"
+HOOK_NAMESPACES = (LEGACY_NAMESPACE, MODERN_NAMESPACE)
+HOOK_PREFIXES = tuple("L%s/" % ns for ns in HOOK_NAMESPACES)
+
 PROFILE_LEGACY = "legacy"
 PROFILE_MODERN = "modern"
 
@@ -781,6 +789,83 @@ def select_patches(profile: str, artifact: str) -> list[MethodPatch]:
     ]
 
 
+# --------------------------------------------------------------------------
+# Hook contract verification
+# --------------------------------------------------------------------------
+# Return types may end in `;` (objects) or `]`/primitive letters. The trailing
+# `;` must be part of the capture, or the reference will not match the
+# declaration read from the `.method` line.
+HOOK_REF_RE = re.compile(r"(L[\w/$]+;)->([\w<>]+\([^)]*\)[\w/$;\[]*)")
+
+
+def index_hook_methods(decompile_dir: str) -> set[str]:
+    """
+    Declared `Lclass;->name(args)ret` entries under the hook namespaces.
+
+    Only those directories are scanned: a decompiled framework.jar holds tens of
+    thousands of smali files, and the check only ever asks about hook classes.
+    """
+    declared: set[str] = set()
+    wanted = tuple(os.sep + ns.replace("/", os.sep) + os.sep for ns in HOOK_NAMESPACES)
+
+    for root, _dirs, files in os.walk(decompile_dir):
+        marker = root + os.sep
+        if not any(w in marker for w in wanted):
+            continue
+        for name in files:
+            if not name.endswith(".smali"):
+                continue
+            cls = None
+            with open(os.path.join(root, name), encoding="utf-8", errors="surrogateescape") as fh:
+                for line in fh:
+                    if cls is None and line.startswith(".class"):
+                        cls = line.split()[-1]
+                    elif cls and line.startswith(".method"):
+                        declared.add("%s->%s" % (cls, line.split()[-1]))
+    return declared
+
+
+def collect_hook_refs(patch: MethodPatch) -> set[str]:
+    """
+    Hook methods a patch calls, extracted from the snippets themselves.
+
+    Deriving these from the snippet text rather than from a hand-maintained list
+    means the check cannot drift away from what the patcher actually emits.
+    """
+    refs: set[str] = set()
+    for op in patch.ops:
+        body = render(op.body, 16, 1, 0, op.param_index, ret="v0")
+        for cls, sig in HOOK_REF_RE.findall(body):
+            if cls.startswith(HOOK_PREFIXES):
+                refs.add("%s->%s" % (cls, sig))
+    return refs
+
+
+def verify_hooks(decompile_dir: str, profile: str, artifact: str) -> list[Result]:
+    """
+    Confirm every hook method a patch calls is actually declared in the tree.
+
+    Without this, a hook payload whose class names or signatures have changed
+    (for example after update_kaorios.sh pulls a newer release) produces a
+    framework that assembles cleanly and then dies at boot with
+    NoSuchMethodError.
+    """
+    declared = index_hook_methods(decompile_dir)
+    results = []
+
+    for patch in select_patches(profile, artifact):
+        refs = collect_hook_refs(patch)
+        missing = sorted(r for r in refs if r not in declared)
+        if missing:
+            results.append(Result(patch.patch_id, "missing", "unresolved: %s" % ", ".join(missing)))
+        elif refs:
+            results.append(Result(patch.patch_id, "ok", "resolved %d hook reference(s)" % len(refs)))
+        else:
+            results.append(Result(patch.patch_id, "ok", "no hook references"))
+
+    return results
+
+
 def run_patches(
     decompile_dir: str, dry_run: bool, profile: str, artifact: str
 ) -> tuple[list[Result], bool]:
@@ -842,10 +927,36 @@ def main(argv: list[str] | None = None) -> int:
         default=ARTIFACT_FRAMEWORK,
     )
 
+    p_verify = sub.add_parser("verify", help="check that hook methods resolve in the tree")
+    p_verify.add_argument("--decompile-dir", required=True)
+    p_verify.add_argument(
+        "--profile",
+        choices=[PROFILE_LEGACY, PROFILE_MODERN],
+        default=PROFILE_LEGACY,
+    )
+    p_verify.add_argument(
+        "--artifact",
+        choices=[ARTIFACT_FRAMEWORK, ARTIFACT_SERVICES],
+        default=ARTIFACT_FRAMEWORK,
+    )
+    p_verify.add_argument("--json", action="store_true")
+
     args = parser.parse_args(argv)
 
     if args.command == "hooks":
         return 0 if select_patches(args.profile, args.artifact) else 1
+
+    if args.command == "verify":
+        results = verify_hooks(args.decompile_dir, args.profile, args.artifact)
+        if args.json:
+            print(json.dumps([r.__dict__ for r in results], indent=2))
+        elif not results:
+            print("[ok       ] no hooks defined for profile=%s artifact=%s" % (args.profile, args.artifact))
+        else:
+            width = max(len(r.patch_id) for r in results)
+            for r in results:
+                print("[%-9s] %-*s  %s" % (r.status, width, r.patch_id, r.detail))
+        return 0 if all(r.status == "ok" for r in results) else 1
 
     if args.command == "inject":
         result = inject_utilities(args.decompile_dir, args.source)

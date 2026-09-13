@@ -128,6 +128,28 @@ block. This is a deliberate divergence from the published guides: if the overrid
 lookup throws, the method falls through to stock behaviour instead of crashing
 every app at startup.
 
+### 2.4 Hook contract verification
+
+Before anything is written, the patcher checks that every hook method its
+snippets call is actually declared in the tree:
+
+```
+[ok       ] keystore2.getKeyEntry                       resolved 1 hook reference(s)
+[missing  ] instrumentation.newApplication(Class,Context)
+            unresolved: Lcom/android/internal/util/kaorios/KaoriPropsUtils;->KaoriProps(Landroid/content/Context;)V
+```
+
+The references are extracted from the snippet text itself, so the check cannot
+drift away from what the patcher emits. This matters because the hook payload is
+not pinned to this repository: `scripts/update_kaorios.sh` pulls the latest
+release, and if a future release renames a class or changes a signature, the
+patched framework would assemble cleanly and then die at boot with
+`NoSuchMethodError`. Failing early with the missing signature named is far
+cheaper to debug.
+
+The check is skipped during `--dry-run` (the hook classes are not injected then,
+so they cannot resolve yet) and can be disabled with `--no-verify-hooks`.
+
 ---
 
 ## 3. Running the patcher
@@ -162,6 +184,7 @@ cd Toolbox-patcher
 | `--keep-work` | keep the decompiled trees |
 | `--no-d8` | skip D8 optimisation |
 | `--no-module` | skip building the Magisk module zip |
+| `--no-verify-hooks` | skip the hook contract check |
 | `--json` | machine-readable patch report |
 
 Output is one line per hook:
@@ -195,7 +218,16 @@ python3 scripts/tests/test_engine.py
 Builds miniature framework trees using register layouts the old patcher could
 not handle, and asserts the engine patches them correctly for both profiles,
 including the `generateKeyPair()` case where growing the frame would break the
-invoke encoding.
+invoke encoding. It also checks that the hook contract verification rejects a
+renamed hook method.
+
+To check the real payload in this repository against the patch table:
+
+```bash
+mkdir -p /tmp/vcheck/smali/com/android/internal/util/kaorios
+cp kaorios_toolbox/utils/kaorios/*.smali /tmp/vcheck/smali/com/android/internal/util/kaorios/
+python3 scripts/lib/smali_engine.py verify --decompile-dir /tmp/vcheck --profile legacy
+```
 
 ---
 

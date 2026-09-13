@@ -56,6 +56,7 @@ Options:
       --keep-work         Keep the decompiled trees
       --no-d8             Skip the D8 DEX optimisation step
       --no-module         Skip building the Magisk module zip
+      --no-verify-hooks   Skip the static check that hook methods resolve
       --json              Emit the patch report as JSON
       --list-hooks        Print the hooks each profile applies, then exit
   -h, --help              Show this help
@@ -76,6 +77,7 @@ DRY_RUN=0
 KEEP_WORK=0
 RUN_D8=1
 BUILD_MODULE=1
+VERIFY_HOOKS=1
 JSON=0
 
 while [ $# -gt 0 ]; do
@@ -89,6 +91,7 @@ while [ $# -gt 0 ]; do
         --keep-work)      KEEP_WORK=1; shift ;;
         --no-d8)          RUN_D8=0; shift ;;
         --no-module)      BUILD_MODULE=0; shift ;;
+        --no-verify-hooks) VERIFY_HOOKS=0; shift ;;
         --json)           JSON=1; shift ;;
         --list-hooks)     kaorios_engine list; exit 0 ;;
         -h|--help)        usage; exit 0 ;;
@@ -195,7 +198,7 @@ patch_one_jar() {
         }
     fi
 
-    apply_kaorios_toolbox_patches "$decompile_dir" "$SDK" "$JSON" "$DRY_RUN" "$PROFILE" "$artifact" || {
+    apply_kaorios_toolbox_patches "$decompile_dir" "$SDK" "$JSON" "$DRY_RUN" "$PROFILE" "$artifact" "$VERIFY_HOOKS" || {
         err "Patching failed. The decompiled tree is at $decompile_dir"
         return 1
     }

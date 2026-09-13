@@ -29,7 +29,59 @@ import tempfile
 HERE = os.path.dirname(os.path.abspath(__file__))
 ENGINE = os.path.abspath(os.path.join(HERE, "..", "lib", "smali_engine.py"))
 
-HOOK_STUB = ".class public final Lcom/android/internal/util/kaorios/KaoriPropsUtils;\n"
+HOOK_STUBS = {
+    "KaoriPropsUtils.smali": """\
+.class public final Lcom/android/internal/util/kaorios/KaoriPropsUtils;
+.super Ljava/lang/Object;
+
+.method public static KaoriProps(Landroid/content/Context;)V
+    .registers 1
+
+    return-void
+.end method
+
+.method public static KaoriGetCertificateChain()V
+    .registers 0
+
+    return-void
+.end method
+""",
+    "KaoriKeyboxHooks.smali": """\
+.class public Lcom/android/internal/util/kaorios/KaoriKeyboxHooks;
+.super Ljava/lang/Object;
+
+.method public static KaoriGetKeyEntry(Landroid/system/keystore2/KeyEntryResponse;)Landroid/system/keystore2/KeyEntryResponse;
+    .registers 1
+
+    return-object p0
+.end method
+
+.method public static KaoriGetCertificateChain([Ljava/security/cert/Certificate;)[Ljava/security/cert/Certificate;
+    .registers 1
+
+    return-object p0
+.end method
+""",
+    "KaoriFeatureOverrides.smali": """\
+.class public final Lcom/android/internal/util/kaorios/KaoriFeatureOverrides;
+.super Ljava/lang/Object;
+
+.method public static getOverride(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/Boolean;
+    .registers 4
+
+    const/4 v0, 0x0
+
+    return-object v0
+.end method
+""",
+}
+
+# Same shape, but KaoriProps was renamed: the patcher would still assemble and
+# then die at boot with NoSuchMethodError. verify must catch this.
+BROKEN_HOOK_STUBS = dict(HOOK_STUBS)
+BROKEN_HOOK_STUBS["KaoriPropsUtils.smali"] = HOOK_STUBS["KaoriPropsUtils.smali"].replace(
+    "KaoriProps(Landroid/content/Context;)V", "KaoriInitContext(Landroid/content/Context;)V"
+)
 
 # --------------------------------------------------------------------------
 # Shared fixtures
@@ -151,7 +203,7 @@ SERVICES_FIXTURES = {
 }
 
 
-def build_tree(fixtures: dict[str, str]) -> str:
+def build_tree(fixtures: dict[str, str], stubs: dict[str, str] | None = None) -> str:
     root = tempfile.mkdtemp(prefix="kaorios_engine_test_")
     for rel, content in fixtures.items():
         path = os.path.join(root, *rel.split("/"))
@@ -161,8 +213,9 @@ def build_tree(fixtures: dict[str, str]) -> str:
 
     source = os.path.join(root, "_hooks")
     os.makedirs(source, exist_ok=True)
-    with open(os.path.join(source, "KaoriPropsUtils.smali"), "w", encoding="utf-8") as fh:
-        fh.write(HOOK_STUB)
+    for name, content in (stubs if stubs is not None else HOOK_STUBS).items():
+        with open(os.path.join(source, name), "w", encoding="utf-8", newline="\n") as fh:
+            fh.write(content)
     return root
 
 
@@ -195,6 +248,9 @@ def test_legacy(c: Checker) -> None:
 
         res = run("inject", "--decompile-dir", root, "--source", source)
         c.equals("legacy inject exit code", res.returncode, 0)
+
+        res = run("verify", "--decompile-dir", root, "--profile", "legacy")
+        c.equals("legacy verify exit code", res.returncode, 0)
 
         res = run("patch", "--decompile-dir", root, "--profile", "legacy", "--sdk", "31")
         print("--- legacy, first run ---")
@@ -291,6 +347,47 @@ def test_bucket_selection(c: Checker) -> None:
         shutil.rmtree(root, ignore_errors=True)
 
 
+def test_verify_contract(c: Checker) -> None:
+    # A matching contract passes.
+    root = build_tree(LEGACY_FIXTURES)
+    try:
+        source = os.path.join(root, "_hooks")
+        run("inject", "--decompile-dir", root, "--source", source)
+        res = run("verify", "--decompile-dir", root, "--profile", "legacy")
+        print("--- verify, matching contract ---")
+        print(res.stdout.strip())
+        c.equals("verify: matching contract passes", res.returncode, 0)
+    finally:
+        shutil.rmtree(root, ignore_errors=True)
+
+    # A renamed hook method must be reported, otherwise the patched framework
+    # assembles cleanly and then dies at boot with NoSuchMethodError.
+    root = build_tree(LEGACY_FIXTURES, stubs=BROKEN_HOOK_STUBS)
+    try:
+        source = os.path.join(root, "_hooks")
+        run("inject", "--decompile-dir", root, "--source", source)
+        res = run("verify", "--decompile-dir", root, "--profile", "legacy")
+        print("--- verify, renamed hook method ---")
+        print(res.stdout.strip())
+        c.equals("verify: renamed hook method fails", res.returncode, 1)
+        c.check(
+            "verify: names the missing method",
+            "KaoriProps(Landroid/content/Context;)V" in res.stdout,
+        )
+    finally:
+        shutil.rmtree(root, ignore_errors=True)
+
+    # The modern payload is not in this repository, so verify must say so
+    # rather than silently pass.
+    root = build_tree(MODERN_FIXTURES)
+    try:
+        res = run("verify", "--decompile-dir", root, "--profile", "modern")
+        c.equals("verify: absent modern payload fails", res.returncode, 1)
+        c.check("verify: mentions the modern hook", "KaoriosHook" in res.stdout)
+    finally:
+        shutil.rmtree(root, ignore_errors=True)
+
+
 def test_profile_listing(c: Checker) -> None:
     res = run("list")
     c.equals("list exit code", res.returncode, 0)
@@ -305,6 +402,7 @@ def main() -> int:
     test_modern(c)
     test_services(c)
     test_bucket_selection(c)
+    test_verify_contract(c)
     test_profile_listing(c)
 
     if c.failures:
