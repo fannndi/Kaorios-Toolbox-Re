@@ -17,10 +17,6 @@ For **version 2.0.4.0 and below**, see:
 - 🙈 Hide installed app list (Caller-aware isolation).
 - 🛠️ Hide Developer Options & ADB status.
 - 🔓 Disable FLAG_SECURE (Take screenshots & screen record restricted apps).
-- ☁️ Google Photos unlimited backup.
-- 🧰 Payload dumper integration.
-- 🎮 Unlock high-FPS modes in games.
-- 📊 Overlay display for FPS and CPU.
 - ⚙️ Spoof setting value per app
 
 ---
@@ -93,6 +89,5 @@ Help us translate Kaorios-Toolbox into your language! 🌐
 
 ## 🙏 Credits
 
-- **Payload Dumper** — [rcmiku](https://github.com/rcmiku/Payload-Dumper-Compose).
 - **AOSP Framework**
 - **Trickystore**

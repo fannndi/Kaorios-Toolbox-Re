@@ -3,7 +3,7 @@
 [English](notes-a17.md) | **Tiếng Việt**
 
 Trang này chỉ chứa các bước bổ sung dành riêng cho ROM đích chạy **Android 17 / SDK 37 (Baklava)**.
-Trên android 17, có tình trạng 1 số tính năng hoạt động không đúng cách (điển hình là spoof google photo), dưới đây là giải pháp
+Trên Android 17, việc spoof các trường Build có thể hoạt động không đúng cách; dưới đây là giải pháp
 ---
 
 ## 3. Tìm DEX stock chứa `Build`

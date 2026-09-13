@@ -4,7 +4,7 @@
 
 This page only contains additional steps specifically for target ROMs running **Android 17 / SDK 37 (Baklava)**.
 
-On Android 17, some features may not work correctly (most notably Google Photos spoofing). The following steps provide a workaround.
+On Android 17, Build-field spoofing may not work correctly. The following steps provide a workaround.
 
 ---
 

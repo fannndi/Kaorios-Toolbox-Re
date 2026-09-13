@@ -136,14 +136,6 @@
     "PRODUCT": "NX769J",
     "FINGERPRINT": "nubia/NX769J/NX769J:14/UKQ1.230917.001/20240813.173312:user/release-keys"
   },
-  "com.netflix.mediaclient": {
-    "BRAND": "google",
-    "DEVICE": "mustang",
-    "MANUFACTURER": "Google",
-    "MODEL": "Pixel 10 Pro XL",
-    "FINGERPRINT": "google/mustang/mustang:16/BD3A.251005.003.W3/14147046:user/release-keys",
-    "PRODUCT": "mustang"
-  },
   "com.ngame.allstar.eu": {
     "BRAND": "realme",
     "DEVICE": "Realme 15 Pro 5G",
