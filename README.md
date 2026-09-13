@@ -1,5 +1,24 @@
 # Farewell Toolbox
 
+Android app that patches `framework.jar` / `services.jar` with the Farewell hook on-device and produces a flashable recovery zip.
+
+## 🧱 Project layout
+
+- `app/` — Farewell Toolbox APK (Jetpack Compose): patch status ON/OFF, build & export the flashable zip, stock backup zip, data sync.
+- `patcher/` — dexlib2 patch engine: signature-based rules for framework/services, 4-byte aligned jar writer, flashable zip builder, CLI.
+- `hook/` — `android.security.farewell.FarewellHook` library, compiled to `hook.dex` with D8 and injected into the patched jars.
+- `Toolbox-data/`, `Toolbox-languages/`, `Toolbox-docs/` — app data, translations, framework patch documentation.
+
+## 🛠️ Building
+
+Requirements: JDK 17+ and Android SDK (platform 37, build-tools 36/37).
+
+```bash
+./gradlew :app:assembleDebug        # build the APK
+./gradlew :patcher:run --args="--input stock.jar --output patched.jar --hook build/hook/hook.dex --kind FRAMEWORK"   # patch a jar/APK
+./gradlew :patcher:run --args="--input stock.jar --scan"   # ROM capability scan
+```
+
 ## ✨ Features
 
 - ✅ Play Integrity fix.
