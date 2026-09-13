@@ -11,6 +11,24 @@ init_env() {
     mkdir -p "$BACKUP_DIR"
 }
 
+kaorios_python() {
+    # Resolve a python interpreter for the patch engine.
+    # Honours KAORIOS_PYTHON, then python3, then python.
+    if [ -n "${KAORIOS_PYTHON:-}" ]; then
+        printf '%s\n' "$KAORIOS_PYTHON"
+        return 0
+    fi
+    if command -v python3 >/dev/null 2>&1; then
+        printf 'python3\n'
+        return 0
+    fi
+    if command -v python >/dev/null 2>&1; then
+        printf 'python\n'
+        return 0
+    fi
+    return 1
+}
+
 ensure_tools() {
     # Checks for java, apktool.jar and 7z (optional)
     if ! command -v java >/dev/null 2>&1; then
@@ -20,6 +38,12 @@ ensure_tools() {
 
     if [ ! -f "${TOOLS_DIR}/apktool.jar" ]; then
         err "apktool.jar not found at ${TOOLS_DIR}/apktool.jar"
+        return 1
+    fi
+
+    if ! kaorios_python >/dev/null 2>&1; then
+        err "No python interpreter found (needed by the smali patch engine)."
+        err "Install python3 or point KAORIOS_PYTHON at one."
         return 1
     fi
 

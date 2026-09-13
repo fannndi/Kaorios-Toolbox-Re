@@ -6,6 +6,13 @@ on:
       framework_url:
         description: 'Direct URL to framework.jar'
         required: true
+      sdk:
+        description: 'Target Android SDK level (31 = Android 12, 33 = Android 13, 34 = Android 14, 35 = Android 15)'
+        required: true
+        default: '31'
+      rom_url:
+        description: 'Optional: direct URL to the ROM build.prop (used to confirm the SDK level)'
+        required: false
 
 jobs:
   patch:
@@ -20,23 +27,40 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Run engine self-test
+        run: python3 Toolbox-patcher/scripts/tests/test_engine.py
+
       - name: Download framework.jar
+        run: wget -O framework.jar "${{ github.event.inputs.framework_url }}"
+
+      - name: Download build.prop
+        if: ${{ github.event.inputs.rom_url != '' }}
         run: |
-          wget -O framework.jar "${{ github.event.inputs.framework_url }}"
+          mkdir -p rom/system
+          wget -O rom/system/build.prop "${{ github.event.inputs.rom_url }}"
 
       - name: Run Patcher
         run: |
           chmod +x Toolbox-patcher/scripts/patcher.sh
-          # The script expects to be run from Toolbox-patcher directory where tools are located
           cd Toolbox-patcher
-          # Copy framework.jar to current dir
           cp ../framework.jar .
-          ./scripts/patcher.sh framework.jar
+          # --sdk is required: D8 --min-api is derived from it, so the patched
+          # framework is optimised for the ROM it will actually run on.
+          if [ -d ../rom/system ]; then
+            ./scripts/patcher.sh --sdk "${{ github.event.inputs.sdk }}" --rom-dir ../rom framework.jar
+          else
+            ./scripts/patcher.sh --sdk "${{ github.event.inputs.sdk }}" framework.jar
+          fi
 
       - name: Upload Patched Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: framework-patched
+          name: framework-patched-sdk${{ github.event.inputs.sdk }}
           path: |
             Toolbox-patcher/framework_patched.jar
             Toolbox-patcher/kaoriosFramework.zip

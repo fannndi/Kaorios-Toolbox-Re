@@ -76,11 +76,22 @@ recompile_jar() {
 
 d8_optimize_jar() {
     local jar_file="$1"
+    local min_api="${2:-${MIN_API:-}}"
 
-    # Configuration
-    # API 35 (Android 15) is used to ensure compatibility with available build tools
-    # while supporting recent DEX features.
-    local MIN_API=35
+    # --min-api must never be higher than the ROM the patched framework will
+    # run on. D8 uses it to decide how much desugaring and API backporting to
+    # apply, so an inflated value (the old script hardcoded 35, the SDK level of
+    # Android 15) produces output that is not guaranteed to load on an older
+    # device. Callers pass the detected SDK level; if it is unknown we refuse to
+    # guess rather than silently produce a framework that may not boot.
+    if [ -z "$min_api" ]; then
+        err "D8 min-api is unknown — pass the target SDK level (31 for Android 12)."
+        return 1
+    fi
+    case "$min_api" in
+        ''|*[!0-9]*) err "Invalid min-api '$min_api'"; return 1 ;;
+    esac
+    local MIN_API="$min_api"
 
     # Use the provided D8_CMD variable or default to 'd8'
     local d8_cmd="${D8_CMD:-d8}"
