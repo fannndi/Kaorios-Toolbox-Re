@@ -11245,7 +11245,7 @@
     .param p1, "name"    # Ljava/lang/String;
     .param p2, "version"    # I
 
-    invoke-static {p1, p2}, Landroid/security/kaorios/KaoriosHook;->hasSystemFeature(Ljava/lang/String;I)Ljava/lang/Boolean;
+    invoke-static {p1, p2}, Landroid/security/farewell/FarewellHook;->hasSystemFeature(Ljava/lang/String;I)Ljava/lang/Boolean;
 
     move-result-object v0
 

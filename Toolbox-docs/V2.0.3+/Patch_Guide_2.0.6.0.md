@@ -1,4 +1,4 @@
-# Kaorios Toolbox Framework 2.0.6.0  
+# Farewell Toolbox Framework 2.0.6.0  
   
 **English** | [Tiếng Việt](Patch_Guide_2.0.6.0_VI.md)  
   
@@ -29,7 +29,7 @@ return-object xY
   
 Add  
 ```smali  
-invoke-static {p1}, Landroid/security/kaorios/KaoriosHook;->initContext(Landroid/content/Context;)V  
+invoke-static {p1}, Landroid/security/farewell/FarewellHook;->initContext(Landroid/content/Context;)V  
 ```  
   
 **Method:**  
@@ -45,7 +45,7 @@ return-object xY
   
 add  
 ```smali  
-invoke-static {p3}, Landroid/security/kaorios/KaoriosHook;->initContext(Landroid/content/Context;)V  
+invoke-static {p3}, Landroid/security/farewell/FarewellHook;->initContext(Landroid/content/Context;)V  
 ```  
 ---  
   
@@ -65,15 +65,15 @@ Landroid/app/ApplicationPackageManager;
   
 Add the following code below `.registers X`:  
 ```smali  
-invoke-static {p1, p2}, Landroid/security/kaorios/KaoriosHook;->hasSystemFeature(Ljava/lang/String;I)Ljava/lang/Boolean;  
+invoke-static {p1, p2}, Landroid/security/farewell/FarewellHook;->hasSystemFeature(Ljava/lang/String;I)Ljava/lang/Boolean;  
 move-result-object v0  
   
-if-eqz v0, :cond_kaorios_feature_stock  
+if-eqz v0, :cond_farewell_feature_stock  
 invoke-virtual {v0}, Ljava/lang/Boolean;->booleanValue()Z  
 move-result v0  
 return v0  
   
-:cond_kaorios_feature_stock  
+:cond_farewell_feature_stock  
 ```  
   
 ---  
@@ -94,13 +94,13 @@ Landroid/security/keystore2/AndroidKeyStoreKeyPairGeneratorSpi;
   
 Add the following code below `.registers X`:  
 ```smali  
-invoke-static {p0}, Landroid/security/kaorios/KaoriosHook;->initGenerateSoftwareKeyPair(Ljava/lang/Object;)Ljava/security/KeyPair;  
+invoke-static {p0}, Landroid/security/farewell/FarewellHook;->initGenerateSoftwareKeyPair(Ljava/lang/Object;)Ljava/security/KeyPair;  
 move-result-object vX  
   
-if-eqz vX, :cond_kaorios_gen_stock  
+if-eqz vX, :cond_farewell_gen_stock  
 return-object vX  
   
-:cond_kaorios_gen_stock  
+:cond_farewell_gen_stock  
 ```  
   
 In this method, pay attention to `.registers X`.  
@@ -129,7 +129,7 @@ Landroid/security/keystore2/AndroidKeyStoreSpi;
  engineGetCertificateChain(Ljava/lang/String;)[Ljava/security/cert/Certificate;  
 ```  
   
-Before the final return, pass the final `Certificate[]` through Kaorios:  
+Before the final return, pass the final `Certificate[]` through Farewell:  
   
 Find this part:  
   
@@ -147,7 +147,7 @@ aput-object vB, vC, vA
 add  
   
 ```smali  
-invoke-static {vC}, Landroid/security/kaorios/KaoriosHook;->CertificateChainIfNeeded([Ljava/security/cert/Certificate;)[Ljava/security/cert/Certificate;  
+invoke-static {vC}, Landroid/security/farewell/FarewellHook;->CertificateChainIfNeeded([Ljava/security/cert/Certificate;)[Ljava/security/cert/Certificate;  
 move-result-object vD  
 # return-object vD  
 ```  
@@ -164,7 +164,7 @@ Also, in `invoke-static {vC}`, the array register `vC` is the same register used
 const/4 v4, 0x0  
 aput-object v2, v3, v4  
   
-invoke-static {v3}, Landroid/security/kaorios/KaoriosHook;->CertificateChainIfNeeded([Ljava/security/cert/Certificate;)[Ljava/security/cert/Certificate;  
+invoke-static {v3}, Landroid/security/farewell/FarewellHook;->CertificateChainIfNeeded([Ljava/security/cert/Certificate;)[Ljava/security/cert/Certificate;  
 move-result-object v3  
   
 return-object v3  
@@ -188,7 +188,7 @@ Lcom/android/server/SystemServer;->startOtherServices(Lcom/android/server/utils/
   
 add  
 ```smali  
-invoke-static {}, Landroid/security/kaorios/KaoriosHook;->initSystemServer()V  
+invoke-static {}, Landroid/security/farewell/FarewellHook;->initSystemServer()V  
 ```  
   
 ---  
@@ -210,14 +210,14 @@ These are optional. Add only the feature you need, after the core patch boots co
 Add the following code below `.registers X`:  
   
 ```smali  
-if-eqz p2, :cond_kaorios_dev_stock  
-invoke-static/range {p1 .. p3}, Landroid/security/kaorios/KaoriosHook;->shouldHideDevStatusFromNameValueCache(Landroid/content/ContentResolver;Ljava/lang/String;I)Z  
+if-eqz p2, :cond_farewell_dev_stock  
+invoke-static/range {p1 .. p3}, Landroid/security/farewell/FarewellHook;->shouldHideDevStatusFromNameValueCache(Landroid/content/ContentResolver;Ljava/lang/String;I)Z  
 move-result v0  
-if-eqz v0, :cond_kaorios_dev_stock  
+if-eqz v0, :cond_farewell_dev_stock  
 const-string v0, "0"  
 return-object v0  
   
-:cond_kaorios_dev_stock  
+:cond_farewell_dev_stock  
 ```  
   
 Use only the overload returning `String`; do not paste this into a `Pair`-returning overload.  
@@ -229,13 +229,13 @@ Patch the Package Manager filter method used by the target ROM. Android 17 refer
   
 ```smali  
 # callingUid, null resolver, target package name, userId  
-invoke-static {vCallingUid, vNull, vTargetPackage, vUserId}, Landroid/security/kaorios/KaoriosHook;->shouldHideAppListForCaller(ILandroid/content/ContentResolver;Ljava/lang/String;I)Z  
+invoke-static {vCallingUid, vNull, vTargetPackage, vUserId}, Landroid/security/farewell/FarewellHook;->shouldHideAppListForCaller(ILandroid/content/ContentResolver;Ljava/lang/String;I)Z  
 move-result vResult  
-if-eqz vResult, :cond_kaorios_hide_stock  
+if-eqz vResult, :cond_farewell_hide_stock  
 const/4 v0, 0x1  
 return v0  
   
-:cond_kaorios_hide_stock  
+:cond_farewell_hide_stock  
 ```  
   
 The argument order is fixed: `callingUid, resolver, targetPackageName, userId`. Find the real registers in your ROM; the template is reference only.  
@@ -250,7 +250,7 @@ After the stock installer value is resolved, pass it through:
   
 ```smali  
 const/4 vNull, 0x0  
-invoke-static {vNull, vCallingUid, p2, p1, vInstaller}, Landroid/security/kaorios/KaoriosHook;->filterInstallerPackageName(Landroid/content/ContentResolver;IILjava/lang/String;Ljava/lang/String;)Ljava/lang/String;  
+invoke-static {vNull, vCallingUid, p2, p1, vInstaller}, Landroid/security/farewell/FarewellHook;->filterInstallerPackageName(Landroid/content/ContentResolver;IILjava/lang/String;Ljava/lang/String;)Ljava/lang/String;  
 move-result-object vInstaller  
 return-object vInstaller  
 ```  
@@ -277,14 +277,14 @@ the original value. `vNull` is any free local register initialized to null.
 # Apply a configured null/removal first. Use only when null is the ROM's
 # normal representation of a missing String setting.
 const/4 vNull, 0x0
-invoke-static {vNull, vNamespace, vName}, Landroid/security/kaorios/KaoriosHook;->shouldRemoveSetting(Landroid/content/ContentResolver;Ljava/lang/String;Ljava/lang/String;)Z
+invoke-static {vNull, vNamespace, vName}, Landroid/security/farewell/FarewellHook;->shouldRemoveSetting(Landroid/content/ContentResolver;Ljava/lang/String;Ljava/lang/String;)Z
 move-result vRemove
-if-eqz vRemove, :cond_kaorios_setting_value
+if-eqz vRemove, :cond_farewell_setting_value
 const/4 vValue, 0x0
 return-object vValue
 
-:cond_kaorios_setting_value
-invoke-static {vNull, vNamespace, vName, vValue}, Landroid/security/kaorios/KaoriosHook;->filterSettingValue(Landroid/content/ContentResolver;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
+:cond_farewell_setting_value
+invoke-static {vNull, vNamespace, vName, vValue}, Landroid/security/farewell/FarewellHook;->filterSettingValue(Landroid/content/ContentResolver;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
 move-result-object vValue
 return-object vValue
 ```

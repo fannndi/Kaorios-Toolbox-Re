@@ -1795,7 +1795,7 @@
 
     if-eqz p2, :cond_b
 
-    invoke-static/range {p1 .. p3}, Landroid/security/kaorios/KaoriosHook;->shouldHideDevStatusFromNameValueCache(Landroid/content/ContentResolver;Ljava/lang/String;I)Z
+    invoke-static/range {p1 .. p3}, Landroid/security/farewell/FarewellHook;->shouldHideDevStatusFromNameValueCache(Landroid/content/ContentResolver;Ljava/lang/String;I)Z
 
     move-result v0
 

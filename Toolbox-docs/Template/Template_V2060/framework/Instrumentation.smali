@@ -960,7 +960,7 @@
     invoke-virtual {v0, p1}, Landroid/app/Application;->attach(Landroid/content/Context;)V
 
     .line 1390
-    invoke-static {p1}, Landroid/security/kaorios/KaoriosHook;->initContext(Landroid/content/Context;)V
+    invoke-static {p1}, Landroid/security/farewell/FarewellHook;->initContext(Landroid/content/Context;)V
 
     return-object v0
 .end method
@@ -5790,7 +5790,7 @@
     invoke-virtual {v0, p3}, Landroid/app/Application;->attach(Landroid/content/Context;)V
 
     .line 1372
-    invoke-static {p3}, Landroid/security/kaorios/KaoriosHook;->initContext(Landroid/content/Context;)V
+    invoke-static {p3}, Landroid/security/farewell/FarewellHook;->initContext(Landroid/content/Context;)V
 
     return-object v0
 .end method

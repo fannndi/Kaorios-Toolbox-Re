@@ -1,4 +1,4 @@
-# Kaorios Toolbox — Hướng dẫn tắt Secure Flag
+# Farewell Toolbox — Hướng dẫn tắt Secure Flag
 
 [English](Disable_Secure_Flag.md)
 
@@ -25,17 +25,17 @@ isScreenCaptureAllowed(I)Z
 Thêm ngay sau `.registers X`:
 
 ```smali
-invoke-static {}, Landroid/security/kaorios/KaoriosHook;->isSecureFlag()Z
+invoke-static {}, Landroid/security/farewell/FarewellHook;->isSecureFlag()Z
 
     move-result v0
 
-    if-eqz v0, :cond_kaorios
+    if-eqz v0, :cond_farewell
 
     const/4 v0, 0x1
 
     return v0
 
-    :cond_kaorios
+    :cond_farewell
 ```
 
 ### 2. Bỏ cờ Secure ở Window Manager
@@ -63,17 +63,17 @@ isSecureLocked()Z
 Thêm ngay sau `.registers X`:
 
 ```smali
-invoke-static {}, Landroid/security/kaorios/KaoriosHook;->isSecureFlag()Z
+invoke-static {}, Landroid/security/farewell/FarewellHook;->isSecureFlag()Z
 
     move-result v0
 
-    if-eqz v0, :cond_kaorios
+    if-eqz v0, :cond_farewell
 
     const/4 v0, 0x0
 
     return v0
 
-    :cond_kaorios
+    :cond_farewell
 ```
 
 **Method:**
@@ -85,15 +85,15 @@ setSecureLocked(Z)V
 Thêm ngay sau `.registers X`:
 
 ```smali
-invoke-static {}, Landroid/security/kaorios/KaoriosHook;->isSecureFlag()Z
+invoke-static {}, Landroid/security/farewell/FarewellHook;->isSecureFlag()Z
 
     move-result v0
 
-    if-eqz v0, :cond_kaorios
+    if-eqz v0, :cond_farewell
 
     return-void
 
-    :cond_kaorios
+    :cond_farewell
 ```
 
 ### 3. Cho phép chụp display
@@ -123,15 +123,15 @@ Ngay sau:
 thêm:
 
 ```smali
-invoke-static {}, Landroid/security/kaorios/KaoriosHook;->isSecureFlag()Z
+invoke-static {}, Landroid/security/farewell/FarewellHook;->isSecureFlag()Z
 
     move-result vX
 
-    if-eqz vX, :cond_kaorios
+    if-eqz vX, :cond_farewell
 
     const/4 v0, 0x0
 
-    :cond_kaorios
+    :cond_farewell
 ```
 
 Tăng `.registers` thêm `1`, rồi thay `vX` bằng register mới.

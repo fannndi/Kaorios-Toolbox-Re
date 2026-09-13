@@ -1,6 +1,6 @@
 <resources>
     <string name="check_framework_ok">Проверка фреймворка: OK</string>
-    <string name="framework_not_imported">Фреймворк не импортирован или отсутствует KaoriosToolbox</string>
+    <string name="framework_not_imported">Фреймворк не импортирован или отсутствует FarewellToolbox</string>
 
     <!-- Tabs -->
     <string name="tab_home">Главная</string>
@@ -99,14 +99,14 @@
     <string name="home_device_name_edit_title">Отображаемое имя устройства</string>
     <string name="home_device_name_edit_hint">Оставьте пустым для значения из системы</string>
     <string name="home_hero_subtitle_edit_title">Подзаголовок hero</string>
-    <string name="home_hero_subtitle_edit_hint">Оставьте пустым, чтобы вернуть «Mod by Kousei»</string>
+    <string name="home_hero_subtitle_edit_hint">Оставьте пустым, чтобы вернуть «Mod by Farewell»</string>
     <string name="home_hero_image_title">Изображение hero</string>
     <string name="home_hero_pick_gallery">Выбрать из галереи</string>
     <string name="home_hero_reset">По умолчанию</string>
     <string name="avatar_hide_icon_title">Скрыть иконку аватара</string>
     <string name="avatar_hide_icon_desc">Центрировать имя устройства на изображении hero</string>
     <string name="donate_title">Поддержать разработчика</string>
-    <string name="donate_desc">Если Kaorios Toolbox вам помог, рассмотрите возможность доната.</string>
+    <string name="donate_desc">Если Farewell Toolbox вам помог, рассмотрите возможность доната.</string>
     <string name="donate_vcb">Vietcombank</string>
     <string name="tools_section_quotes">Группа поддержки</string>
     <string name="settings_group_appearance">Оформление</string>
@@ -137,7 +137,7 @@
     <string name="settings_suggest_enable_fallback">Не удалось сохранить. Откройте настройки Toolbox: включите Fallback (рут) или предоставьте разрешение «Изменение системных настроек» ниже.</string>
     <string name="perm_section_title">Разрешения</string>
     <string name="perm_modify_system_settings_title">Изменение системных настроек</string>
-    <string name="perm_modify_system_settings_desc">Разрешить Kaorios Toolbox изменять системные настройки.</string>
+    <string name="perm_modify_system_settings_desc">Разрешить Farewell Toolbox изменять системные настройки.</string>
     <string name="perm_open_app_details_title">О приложении</string>
     <string name="perm_open_app_details_desc">Открыть страницу приложения в системных настройках.</string>
     <string name="perm_open_permissions_button">Разрешения приложения</string>
@@ -148,7 +148,7 @@
     <string name="opt_custom_color">Свой цвет</string>
     <string name="theme">Тема</string>
     <string name="language">Язык</string>
-    <string name="author_desc">Разработчик Kaorios Toolbox</string>
+    <string name="author_desc">Разработчик Farewell Toolbox</string>
     <string name="not_found">Не найдено</string>
 
     <!-- Dialogs -->
@@ -183,7 +183,7 @@
     <string name="fallback_msg">Fallback: %1$s</string>
     <string name="device_banned">Устройство заблокировано администратором.</string>
     <string name="downloading_data">Загрузка данных…</string>
-    <string name="framework_missing_msg">Для работы необходимо пропатчить фреймворк драйвером KaoriosToolbox.</string>
+    <string name="framework_missing_msg">Для работы необходимо пропатчить фреймворк драйвером FarewellToolbox.</string>
     <string name="download_release">Скачать релиз</string>
     <string name="root_granted">Рут-доступ предоставлен</string>
     <string name="root_denied">Рут-доступ запрещен или не найден</string>
@@ -219,7 +219,7 @@
     <string name="debug_mode_enabled_msg">Режим отладки включен</string>
     <string name="debug_mode_disabled_msg">Режим отладки выключен</string>
     <string name="exit_app_title">Закрыть приложение?</string>
-    <string name="exit_app_message">Спасибо за использование Kaorios Toolbox</string>
+    <string name="exit_app_message">Спасибо за использование Farewell Toolbox</string>
     <string name="exit_app_confirm">Выйти</string>
     <string name="wallpaper_settings">Выбор обоев</string>
     <string name="wallpaper_settings_desc">Фоновое изображение и размытие</string>

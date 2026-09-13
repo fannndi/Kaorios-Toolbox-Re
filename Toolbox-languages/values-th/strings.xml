@@ -1,6 +1,6 @@
 <resources>
     <string name="check_framework_ok">ตรวจสอบเฟรมเวิร์ก OK</string>
-    <string name="framework_not_imported">ยังไม่ได้นำเข้าเฟรมเวิร์กหรือไม่มี KaoriosToolbox</string>
+    <string name="framework_not_imported">ยังไม่ได้นำเข้าเฟรมเวิร์กหรือไม่มี FarewellToolbox</string>
 
     <!-- Tabs -->
     <string name="tab_home">หน้าแรก</string>
@@ -91,14 +91,14 @@
     <string name="home_device_name_edit_title">ชื่อที่แสดงของอุปกรณ์</string>
     <string name="home_device_name_edit_hint">เว้นว่างเพื่อใช้ค่าจากระบบ</string>
     <string name="home_hero_subtitle_edit_title">คำบรรยายใต้หัวข้อหลัก</string>
-    <string name="home_hero_subtitle_edit_hint">เว้นว่างเพื่อกลับไปใช้ \"Mod by Kousei\"</string>
+    <string name="home_hero_subtitle_edit_hint">เว้นว่างเพื่อกลับไปใช้ \"Mod by Farewell\"</string>
     <string name="home_hero_image_title">รูปภาพหลัก</string>
     <string name="home_hero_pick_gallery">เลือกจากแกลเลอรี</string>
     <string name="home_hero_reset">ใช้ค่าเริ่มต้น</string>
     <string name="avatar_hide_icon_title">ซ่อนไอคอนอวตาร</string>
     <string name="avatar_hide_icon_desc">จัดชื่ออุปกรณ์กึ่งกลางบนรูปหลักแทน</string>
     <string name="donate_title">สนับสนุนนักพัฒนา</string>
-    <string name="donate_desc">หาก Kaorios Toolbox มีประโยชน์กับคุณ พิจารณาบริจาคได้</string>
+    <string name="donate_desc">หาก Farewell Toolbox มีประโยชน์กับคุณ พิจารณาบริจาคได้</string>
     <string name="donate_vcb">Vietcombank</string>
     <string name="tools_section_quotes">กลุ่มสนับสนุน</string>
     <string name="settings_group_appearance">รูปลักษณ์</string>
@@ -134,7 +134,7 @@
     <string name="settings_suggest_enable_fallback">บันทึกไม่ได้ เปิดการตั้งค่า Toolbox: เปิด Fallback (root) หรือให้สิทธิ์ «แก้ไขการตั้งค่าระบบ» ด้านล่าง</string>
     <string name="perm_section_title">สิทธิ์</string>
     <string name="perm_modify_system_settings_title">แก้ไขการตั้งค่าระบบ</string>
-    <string name="perm_modify_system_settings_desc">อนุญาตให้ Kaorios Toolbox แก้ไขการตั้งค่าอุปกรณ์</string>
+    <string name="perm_modify_system_settings_desc">อนุญาตให้ Farewell Toolbox แก้ไขการตั้งค่าอุปกรณ์</string>
     <string name="perm_open_app_details_title">ข้อมูลแอป</string>
     <string name="perm_open_app_details_desc">เปิดหน้าการตั้งค่าระบบของแอป</string>
     <string name="perm_open_permissions_button">สิทธิ์แอป</string>
@@ -143,7 +143,7 @@
     <string name="main_color">สีหลัก</string>
     <string name="theme">ธีม</string>
     <string name="language">ภาษา</string>
-    <string name="author_desc">ผู้พัฒนา Kaorios Toolbox</string>
+    <string name="author_desc">ผู้พัฒนา Farewell Toolbox</string>
     <string name="not_found">ไม่พบ</string>
 
     <!-- Dialogs -->
@@ -178,7 +178,7 @@
     <string name="fallback_msg">สำรอง: %1$s</string>
     <string name="device_banned">อุปกรณ์ถูกแบนโดยผู้ดูแล</string>
     <string name="downloading_data">กำลังดาวน์โหลดข้อมูล…</string>
-    <string name="framework_missing_msg">ต้องแพตช์เฟรมเวิร์กด้วยไดรเวอร์ KaoriosToolbox จึงจะใช้งานได้</string>
+    <string name="framework_missing_msg">ต้องแพตช์เฟรมเวิร์กด้วยไดรเวอร์ FarewellToolbox จึงจะใช้งานได้</string>
     <string name="download_release">ดาวน์โหลดรีลีส</string>
     <string name="root_granted">ได้รับสิทธิ์ root</string>
     <string name="root_denied">ไม่ได้รับหรือไม่พบ root</string>
@@ -214,7 +214,7 @@
     <string name="debug_mode_enabled_msg">เปิดโหมดดีบัก</string>
     <string name="debug_mode_disabled_msg">ปิดโหมดดีบัก</string>
     <string name="exit_app_title">ปิดแอป?</string>
-    <string name="exit_app_message">ขอบคุณที่ใช้ Kaorios Toolbox</string>
+    <string name="exit_app_message">ขอบคุณที่ใช้ Farewell Toolbox</string>
     <string name="exit_app_confirm">ออกจากแอป</string>
 
     <string name="fwk_main_title">ซิงก์เฟรมเวิร์ก</string>

@@ -3,7 +3,7 @@
     <!-- By karigane-cha -->
 
     <string name="check_framework_ok">フレームワークは正常です</string>
-    <string name="framework_not_imported">フレームワークがインポートされていないか、KaoriosToolbox が見つかりません</string>
+    <string name="framework_not_imported">フレームワークがインポートされていないか、FarewellToolbox が見つかりません</string>
 
     <!-- Tabs -->
     <string name="tab_home">ホーム</string>
@@ -36,7 +36,7 @@
     <string name="settings_suggest_enable_fallback">保存できませんでした。Toolbox の設定を開いて、フォールバックモード（Root）を有効にするか、下の「システム設定を変更」権限を付与してください。</string>
     <string name="perm_section_title">権限</string>
     <string name="perm_modify_system_settings_title">システム設定を変更</string>
-    <string name="perm_modify_system_settings_desc">Kaorios Toolbox によるデバイス設定の変更を許可します。</string>
+    <string name="perm_modify_system_settings_desc">Farewell Toolbox によるデバイス設定の変更を許可します。</string>
     <string name="perm_open_app_details_title">アプリの情報</string>
     <string name="perm_open_app_details_desc">アプリのシステム設定ページを開きます。</string>
     <string name="perm_open_permissions_button">アプリの権限</string>
@@ -45,7 +45,7 @@
     <string name="main_color">メインカラー</string>
     <string name="theme">テーマ</string>
     <string name="language">言語</string>
-    <string name="author_desc">Kaorios Toolbox の開発者</string>
+    <string name="author_desc">Farewell Toolbox の開発者</string>
     <string name="not_found">見つかりません</string>
 
     <!-- Dialogs -->
@@ -80,7 +80,7 @@
     <string name="fallback_msg">フォールバック: %1$s</string>
     <string name="device_banned">デバイスは開発者によって禁止されています。</string>
     <string name="downloading_data">データをダウンロード中…</string>
-    <string name="framework_missing_msg">フレームワークは KaoriosToolbox ドライバーでパッチを適用する必要があります。</string>
+    <string name="framework_missing_msg">フレームワークは FarewellToolbox ドライバーでパッチを適用する必要があります。</string>
     <string name="download_release">リリースをダウンロード</string>
     <string name="root_granted">Root 権限が付与されました</string>
     <string name="root_denied">Root 権限が拒否されたか、見つかりません</string>
@@ -116,7 +116,7 @@
     <string name="debug_mode_enabled_msg">デバッグモードが有効です</string>
     <string name="debug_mode_disabled_msg">デバッグモードが無効です</string>
     <string name="exit_app_title">アプリを終了しますか？</string>
-    <string name="exit_app_message">Kaorios Toolbox をご利用いただきありがとうございます</string>
+    <string name="exit_app_message">Farewell Toolbox をご利用いただきありがとうございます</string>
     <string name="exit_app_confirm">アプリを終了</string>
 
     <!-- Framework debug / internal cards (no Settings key names in user text) -->

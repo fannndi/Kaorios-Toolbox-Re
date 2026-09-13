@@ -1,6 +1,6 @@
 <resources>
     <string name="check_framework_ok">Kiểm tra Framework OK</string>
-    <string name="framework_not_imported">Framework chưa được import hoặc thiếu KaoriosToolbox</string>
+    <string name="framework_not_imported">Framework chưa được import hoặc thiếu FarewellToolbox</string>
 
     <!-- Tabs -->
     <string name="tab_home">Trang chủ</string>
@@ -41,7 +41,7 @@
     <string name="settings_suggest_enable_fallback">Không lưu được. Vào Cài đặt Toolbox: bật Fallback (root), hoặc cấp “Chỉnh sửa cài đặt hệ thống” bên dưới.</string>
     <string name="perm_section_title">Quyền</string>
     <string name="perm_modify_system_settings_title">Chỉnh sửa cài đặt hệ thống</string>
-    <string name="perm_modify_system_settings_desc">Cho phép Kaorios Toolbox có quyền chỉnh sửa cài đặt thiết bị.</string>
+    <string name="perm_modify_system_settings_desc">Cho phép Farewell Toolbox có quyền chỉnh sửa cài đặt thiết bị.</string>
     <string name="perm_open_app_details_title">Thông tin ứng dụng</string>
     <string name="perm_open_app_details_desc">Mở trang cài đặt hệ thống của ứng dụng.</string>
     <string name="perm_open_permissions_button">Quyền ứng dụng</string>
@@ -116,14 +116,14 @@
     <string name="home_device_name_edit_title">Tên hiển thị thiết bị</string>
     <string name="home_device_name_edit_hint">Để trống để dùng tên mặc định</string>
     <string name="home_hero_subtitle_edit_title">Dòng chữ phụ</string>
-    <string name="home_hero_subtitle_edit_hint">Để trống để khôi phục "Mod by Kousei"</string>
+    <string name="home_hero_subtitle_edit_hint">Để trống để khôi phục "Mod by Farewell"</string>
     <string name="home_hero_image_title">Ảnh nền thẻ chính</string>
     <string name="home_hero_pick_gallery">Chọn từ thư viện</string>
     <string name="home_hero_reset">Dùng ảnh mặc định</string>
     <string name="avatar_hide_icon_title">Ẩn icon avatar</string>
     <string name="avatar_hide_icon_desc">Ẩn hình ảnh đại diện - icon logo</string>
     <string name="donate_title">Ủng hộ nhà phát triển</string>
-    <string name="donate_desc">Nếu Kaorios Toolbox giúp ích được cho bạn, hãy cân nhắc ủng hộ nà phát triển</string>
+    <string name="donate_desc">Nếu Farewell Toolbox giúp ích được cho bạn, hãy cân nhắc ủng hộ nà phát triển</string>
     <string name="donate_paypal" translatable="false">PayPal</string>
     <string name="donate_vcb">Vietcombank</string>
     <string name="tools_section_quotes">Nhóm hỗ trợ</string>
@@ -148,7 +148,7 @@
     <string name="ui_style_liquid_glass_desc">Gradient nhiều màu phủ lên toàn bộ nền, thẻ và thanh điều hướng</string>
     <string name="pref_ui_style_locked_msg">Các tuỳ chọn màu chỉ khả dụng ở giao diện mặc định.</string>
     <string name="language">Ngôn ngữ</string>
-    <string name="author_desc">Nhà phát triển của Kaorios Toolbox</string>
+    <string name="author_desc">Nhà phát triển của Farewell Toolbox</string>
     <string name="not_found">Không tìm thấy</string>
 
     <!-- Dialogs -->
@@ -183,7 +183,7 @@
     <string name="fallback_msg">Dự phòng: %1$s</string>
     <string name="device_banned">Thiết bị đã bị cấm bởi quản trị viên.</string>
     <string name="downloading_data">Đang tải dữ liệu…</string>
-    <string name="framework_missing_msg">Framework cần vá trình điều khiển của KaoriosToolbox để hoạt động.</string>
+    <string name="framework_missing_msg">Framework cần vá trình điều khiển của FarewellToolbox để hoạt động.</string>
     <string name="download_release">Tải bản phát hành</string>
     <string name="root_granted">Đã cấp quyền Root</string>
     <string name="root_denied">Quyền Root chưa được cấp phép</string>
@@ -229,7 +229,7 @@
     <string name="debug_mode_enabled_msg">Đã bật chế độ debug</string>
     <string name="debug_mode_disabled_msg">Đã tắt chế độ debug</string>
     <string name="exit_app_title">Đóng ứng dụng?</string>
-    <string name="exit_app_message">Cảm ơn bạn vì đã sử dụng Kaorios Toolbox.</string>
+    <string name="exit_app_message">Cảm ơn bạn vì đã sử dụng Farewell Toolbox.</string>
     <string name="exit_app_confirm">Thoát ứng dụng</string>
 
     <string name="fwk_main_title">Đồng bộ framework</string>

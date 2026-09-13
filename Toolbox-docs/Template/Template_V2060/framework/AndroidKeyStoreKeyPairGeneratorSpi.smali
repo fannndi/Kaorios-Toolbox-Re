@@ -3911,7 +3911,7 @@
 .method public whitelist test-api generateKeyPair()Ljava/security/KeyPair;
     .registers 16
 
-    invoke-static {p0}, Landroid/security/kaorios/KaoriosHook;->initGenerateSoftwareKeyPair(Ljava/lang/Object;)Ljava/security/KeyPair;
+    invoke-static {p0}, Landroid/security/farewell/FarewellHook;->initGenerateSoftwareKeyPair(Ljava/lang/Object;)Ljava/security/KeyPair;
 
     move-result-object v14
 

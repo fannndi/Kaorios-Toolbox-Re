@@ -5218,7 +5218,7 @@
 
     aput-object v2, v3, v4
 
-    invoke-static {v3}, Landroid/security/kaorios/KaoriosHook;->CertificateChainIfNeeded([Ljava/security/cert/Certificate;)[Ljava/security/cert/Certificate;
+    invoke-static {v3}, Landroid/security/farewell/FarewellHook;->CertificateChainIfNeeded([Ljava/security/cert/Certificate;)[Ljava/security/cert/Certificate;
 
     move-result-object v3
 

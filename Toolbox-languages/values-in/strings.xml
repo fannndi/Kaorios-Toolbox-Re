@@ -1,6 +1,6 @@
 <resources>
     <string name="check_framework_ok">Pemeriksaan framework OK</string>
-    <string name="framework_not_imported">Framework belum diimpor atau KaoriosToolbox tidak ada</string>
+    <string name="framework_not_imported">Framework belum diimpor atau FarewellToolbox tidak ada</string>
 
     <!-- Tabs -->
     <string name="tab_home">Beranda</string>
@@ -91,14 +91,14 @@
     <string name="home_device_name_edit_title">Nama tampilan perangkat</string>
     <string name="home_device_name_edit_hint">Kosongkan untuk memakai nilai sistem</string>
     <string name="home_hero_subtitle_edit_title">Subjudul hero</string>
-    <string name="home_hero_subtitle_edit_hint">Kosongkan untuk mengembalikan \"Mod by Kousei\"</string>
+    <string name="home_hero_subtitle_edit_hint">Kosongkan untuk mengembalikan \"Mod by Farewell\"</string>
     <string name="home_hero_image_title">Gambar hero</string>
     <string name="home_hero_pick_gallery">Pilih dari galeri</string>
     <string name="home_hero_reset">Gunakan default</string>
     <string name="avatar_hide_icon_title">Sembunyikan ikon avatar</string>
     <string name="avatar_hide_icon_desc">Pusatkan nama perangkat pada gambar hero</string>
     <string name="donate_title">Dukung pengembang</string>
-    <string name="donate_desc">Jika Kaorios Toolbox membantu Anda, pertimbangkan donasi.</string>
+    <string name="donate_desc">Jika Farewell Toolbox membantu Anda, pertimbangkan donasi.</string>
     <string name="donate_vcb">Vietcombank</string>
     <string name="tools_section_quotes">Grup dukungan</string>
     <string name="settings_group_appearance">Tampilan</string>
@@ -134,7 +134,7 @@
     <string name="settings_suggest_enable_fallback">Tidak dapat menyimpan. Buka Setelan Toolbox: aktifkan Fallback (root), atau beri izin «Ubah setelan sistem» di bawah.</string>
     <string name="perm_section_title">Izin</string>
     <string name="perm_modify_system_settings_title">Ubah setelan sistem</string>
-    <string name="perm_modify_system_settings_desc">Izinkan Kaorios Toolbox mengubah setelan perangkat.</string>
+    <string name="perm_modify_system_settings_desc">Izinkan Farewell Toolbox mengubah setelan perangkat.</string>
     <string name="perm_open_app_details_title">Informasi aplikasi</string>
     <string name="perm_open_app_details_desc">Buka halaman setelan sistem untuk aplikasi ini.</string>
     <string name="perm_open_permissions_button">Izin aplikasi</string>
@@ -143,7 +143,7 @@
     <string name="main_color">Warna utama</string>
     <string name="theme">Tema</string>
     <string name="language">Bahasa</string>
-    <string name="author_desc">Pengembang Kaorios Toolbox</string>
+    <string name="author_desc">Pengembang Farewell Toolbox</string>
     <string name="not_found">Tidak ditemukan</string>
 
     <!-- Dialogs -->
@@ -178,7 +178,7 @@
     <string name="fallback_msg">Cadangan: %1$s</string>
     <string name="device_banned">Perangkat telah diblokir oleh administrator.</string>
     <string name="downloading_data">Mengunduh data…</string>
-    <string name="framework_missing_msg">Framework harus ditambal dengan driver KaoriosToolbox agar berfungsi.</string>
+    <string name="framework_missing_msg">Framework harus ditambal dengan driver FarewellToolbox agar berfungsi.</string>
     <string name="download_release">Unduh rilis</string>
     <string name="root_granted">Akses root diberikan</string>
     <string name="root_denied">Akses root ditolak atau tidak ditemukan</string>
@@ -214,7 +214,7 @@
     <string name="debug_mode_enabled_msg">Mode debug diaktifkan</string>
     <string name="debug_mode_disabled_msg">Mode debug dinonaktifkan</string>
     <string name="exit_app_title">Tutup aplikasi?</string>
-    <string name="exit_app_message">Terima kasih telah menggunakan Kaorios Toolbox.</string>
+    <string name="exit_app_message">Terima kasih telah menggunakan Farewell Toolbox.</string>
     <string name="exit_app_confirm">Keluar aplikasi</string>
 
     <string name="fwk_main_title">Sinkron framework</string>

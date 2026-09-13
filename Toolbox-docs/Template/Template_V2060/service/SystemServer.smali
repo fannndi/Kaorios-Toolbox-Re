@@ -3503,7 +3503,7 @@
     invoke-virtual {v0}, Lcom/mediatek/server/MtkSystemServer;->startMtkCoreServices()V
 
     .line 1205
-    invoke-static {}, Landroid/security/kaorios/KaoriosHook;->initSystemServer()V
+    invoke-static {}, Landroid/security/farewell/FarewellHook;->initSystemServer()V
 
     invoke-direct {v1, v3}, Lcom/android/server/SystemServer;->startOtherServices(Lcom/android/server/utils/TimingsTraceAndSlog;)V
 

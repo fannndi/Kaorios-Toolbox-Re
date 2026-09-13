@@ -1909,7 +1909,7 @@
 
     const/4 v3, 0x0
 
-    invoke-static {v3, v2}, Landroid/security/kaorios/KaoriosHook;->shouldHideAppList(Landroid/content/ContentResolver;Ljava/lang/String;)Z
+    invoke-static {v3, v2}, Landroid/security/farewell/FarewellHook;->shouldHideAppList(Landroid/content/ContentResolver;Ljava/lang/String;)Z
 
     move-result v0
 

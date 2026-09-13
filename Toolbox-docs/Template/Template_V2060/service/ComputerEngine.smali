@@ -16861,7 +16861,7 @@
     :try_start_21
     const/4 v5, 0x0
 
-    invoke-static {v5, v0, p2, p1, v2}, Landroid/security/kaorios/KaoriosHook;->filterInstallerPackageName(Landroid/content/ContentResolver;IILjava/lang/String;Ljava/lang/String;)Ljava/lang/String;
+    invoke-static {v5, v0, p2, p1, v2}, Landroid/security/farewell/FarewellHook;->filterInstallerPackageName(Landroid/content/ContentResolver;IILjava/lang/String;Ljava/lang/String;)Ljava/lang/String;
 
     move-result-object v2
     :try_end_26

@@ -1,6 +1,6 @@
 <resources>
     <string name="check_framework_ok">फ़्रेमवर्क जाँच ठीक</string>
-    <string name="framework_not_imported">फ़्रेमवर्क आयात नहीं है या KaoriosToolbox गायब है</string>
+    <string name="framework_not_imported">फ़्रेमवर्क आयात नहीं है या FarewellToolbox गायब है</string>
 
     <!-- Tabs -->
     <string name="tab_home">होम</string>
@@ -91,14 +91,14 @@
     <string name="home_device_name_edit_title">डिवाइस प्रदर्शन नाम</string>
     <string name="home_device_name_edit_hint">सिस्टम मान के लिए खाली छोड़ें</string>
     <string name="home_hero_subtitle_edit_title">हीरो उपशीर्षक</string>
-    <string name="home_hero_subtitle_edit_hint">\"Mod by Kousei\" पुनर्स्थापित करने के लिए खाली छोड़ें</string>
+    <string name="home_hero_subtitle_edit_hint">\"Mod by Farewell\" पुनर्स्थापित करने के लिए खाली छोड़ें</string>
     <string name="home_hero_image_title">हीरो छवि</string>
     <string name="home_hero_pick_gallery">गैलरी से चुनें</string>
     <string name="home_hero_reset">डिफ़ॉल्ट उपयोग करें</string>
     <string name="avatar_hide_icon_title">अवतार आइकन छिपाएँ</string>
     <string name="avatar_hide_icon_desc">हीरो छवि पर डिवाइस नाम केंद्रित करें</string>
     <string name="donate_title">डेवलपर का समर्थन करें</string>
-    <string name="donate_desc">यदि Kaorios Toolbox आपके लिए उपयोगी रहा है, तो दान पर विचार करें।</string>
+    <string name="donate_desc">यदि Farewell Toolbox आपके लिए उपयोगी रहा है, तो दान पर विचार करें।</string>
     <string name="donate_vcb">Vietcombank</string>
     <string name="tools_section_quotes">सपोर्ट समूह</string>
     <string name="settings_group_appearance">दिखावट</string>
@@ -134,7 +134,7 @@
     <string name="settings_suggest_enable_fallback">सहेजा नहीं जा सका। Toolbox सेटिंग्स खोलें: Fallback (रूट) चालू करें, या नीचे «सिस्टम सेटिंग्स बदलें» दें।</string>
     <string name="perm_section_title">अनुमतियाँ</string>
     <string name="perm_modify_system_settings_title">सिस्टम सेटिंग्स बदलें</string>
-    <string name="perm_modify_system_settings_desc">Kaorios Toolbox को डिवाइस सेटिंग्स बदलने दें।</string>
+    <string name="perm_modify_system_settings_desc">Farewell Toolbox को डिवाइस सेटिंग्स बदलने दें।</string>
     <string name="perm_open_app_details_title">ऐप जानकारी</string>
     <string name="perm_open_app_details_desc">ऐप के लिए सिस्टम सेटिंग्स पृष्ठ खोलता है।</string>
     <string name="perm_open_permissions_button">ऐप अनुमतियाँ</string>
@@ -143,7 +143,7 @@
     <string name="main_color">मुख्य रंग</string>
     <string name="theme">थीम</string>
     <string name="language">भाषा</string>
-    <string name="author_desc">Kaorios Toolbox के डेवलपर</string>
+    <string name="author_desc">Farewell Toolbox के डेवलपर</string>
     <string name="not_found">नहीं मिला</string>
 
     <!-- Dialogs -->
@@ -178,7 +178,7 @@
     <string name="fallback_msg">फ़ॉलबैक: %1$s</string>
     <string name="device_banned">डिवाइस को प्रशासक ने प्रतिबंधित किया है।</string>
     <string name="downloading_data">डेटा डाउनलोड हो रहा है…</string>
-    <string name="framework_missing_msg">काम करने के लिए फ़्रेमवर्क को KaoriosToolbox ड्राइवर से पैच करना होगा।</string>
+    <string name="framework_missing_msg">काम करने के लिए फ़्रेमवर्क को FarewellToolbox ड्राइवर से पैच करना होगा।</string>
     <string name="download_release">रिलीज़ डाउनलोड करें</string>
     <string name="root_granted">रूट अनुमति मिली</string>
     <string name="root_denied">रूट अस्वीकृत या नहीं मिला</string>
@@ -214,7 +214,7 @@
     <string name="debug_mode_enabled_msg">डीबग मोड चालू</string>
     <string name="debug_mode_disabled_msg">डीबग मोड बंद</string>
     <string name="exit_app_title">ऐप बंद करें?</string>
-    <string name="exit_app_message">Kaorios Toolbox उपयोग करने के लिए धन्यवाद।</string>
+    <string name="exit_app_message">Farewell Toolbox उपयोग करने के लिए धन्यवाद।</string>
     <string name="exit_app_confirm">ऐप से बाहर निकलें</string>
 
     <string name="fwk_main_title">फ़्रेमवर्क सिंक</string>

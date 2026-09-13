@@ -1,6 +1,6 @@
 <resources>
     <string name="check_framework_ok">Check Framework OK</string>
-    <string name="framework_not_imported">Framework not imported or KaoriosToolbox missing</string>
+    <string name="framework_not_imported">Framework not imported or FarewellToolbox missing</string>
 
     <!-- Tabs -->
     <string name="tab_home">Home</string>
@@ -33,7 +33,7 @@
     <string name="settings_suggest_enable_fallback">Could not save. Open Toolbox Settings: enable Fallback (root), or grant “Modify system settings” below.</string>
     <string name="perm_section_title">Permissions</string>
     <string name="perm_modify_system_settings_title">Modify system settings</string>
-    <string name="perm_modify_system_settings_desc">Allow Kaorios Toolbox to modify device settings.</string>
+    <string name="perm_modify_system_settings_desc">Allow Farewell Toolbox to modify device settings.</string>
     <string name="perm_open_app_details_title">App information</string>
     <string name="perm_open_app_details_desc">Opens the system settings page for the app.</string>
     <string name="perm_open_permissions_button">App permissions</string>
@@ -42,7 +42,7 @@
     <string name="main_color">Main Color</string>
     <string name="theme">Theme</string>
     <string name="language">Language</string>
-    <string name="author_desc">Developer of Kaorios Toolbox</string>
+    <string name="author_desc">Developer of Farewell Toolbox</string>
     <string name="not_found">Not Found</string>
 
     <!-- Dialogs -->
@@ -77,7 +77,7 @@
     <string name="fallback_msg">Fallback: %1$s</string>
     <string name="device_banned">Device has been banned by administrator.</string>
     <string name="downloading_data">Downloading data…</string>
-    <string name="framework_missing_msg">The framework must be patched with the KaoriosToolbox driver to work.</string>
+    <string name="framework_missing_msg">The framework must be patched with the FarewellToolbox driver to work.</string>
     <string name="download_release">Download Release</string>
     <string name="root_granted">Root access granted</string>
     <string name="root_denied">Root access denied or not found</string>
@@ -113,7 +113,7 @@
     <string name="debug_mode_enabled_msg">Debug mode enabled</string>
     <string name="debug_mode_disabled_msg">Debug mode disabled</string>
     <string name="exit_app_title">Close application?</string>
-    <string name="exit_app_message">Thank you for using Kaorios Toolbox</string>
+    <string name="exit_app_message">Thank you for using Farewell Toolbox</string>
     <string name="exit_app_confirm">Exit app</string>
 
     <!-- Framework debug / internal cards (no Settings key names in user text) -->

@@ -1,4 +1,4 @@
-# Kaorios Toolbox Secure Flag Guide
+# Farewell Toolbox Secure Flag Guide
 
 [Tiếng Việt](Disable_Secure_Flag_VI.md)
 
@@ -20,17 +20,17 @@ isScreenCaptureAllowed(I)Z
 ```
 Add the following code below `.registers X`:
 ```smali
-invoke-static {}, Landroid/security/kaorios/KaoriosHook;->isSecureFlag()Z
+invoke-static {}, Landroid/security/farewell/FarewellHook;->isSecureFlag()Z
 
     move-result v0
 
-    if-eqz v0, :cond_kaorios
+    if-eqz v0, :cond_farewell
 
     const/4 v0, 0x1
 
     return v0
 
-    :cond_kaorios
+    :cond_farewell
 ```
 
 ### 2
@@ -52,17 +52,17 @@ isSecureLocked()Z
 
 Add the following code below `.registers X`:
 ```smali
-invoke-static {}, Landroid/security/kaorios/KaoriosHook;->isSecureFlag()Z
+invoke-static {}, Landroid/security/farewell/FarewellHook;->isSecureFlag()Z
 
     move-result v0
 
-    if-eqz v0, :cond_kaorios
+    if-eqz v0, :cond_farewell
 
     const/4 v0, 0x0
 
     return v0
 
-    :cond_kaorios
+    :cond_farewell
 ```
 
 **Method:**
@@ -72,15 +72,15 @@ setSecureLocked(Z)V
 
 Add the following code below `.registers X`:
 ```smali
-invoke-static {}, Landroid/security/kaorios/KaoriosHook;->isSecureFlag()Z
+invoke-static {}, Landroid/security/farewell/FarewellHook;->isSecureFlag()Z
 
     move-result v0
 
-    if-eqz v0, :cond_kaorios
+    if-eqz v0, :cond_farewell
 
     return-void
 
-    :cond_kaorios
+    :cond_farewell
 ```
 
 ### 3 
@@ -105,15 +105,15 @@ Below the line:
 
 Add:
 ```smali
-invoke-static {}, Landroid/security/kaorios/KaoriosHook;->isSecureFlag()Z
+invoke-static {}, Landroid/security/farewell/FarewellHook;->isSecureFlag()Z
 
     move-result vX
 
-    if-eqz vX, :cond_kaorios
+    if-eqz vX, :cond_farewell
 
     const/4 v0, 0x0
 
-    :cond_kaorios
+    :cond_farewell
 ```
 
 **Add +1 to the Registers number, and replace vX with the new register.**

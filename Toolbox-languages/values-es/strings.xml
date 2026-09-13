@@ -1,6 +1,6 @@
 <resources>
     <string name="check_framework_ok">Comprobación del framework: OK</string>
-    <string name="framework_not_imported">Framework no importado o falta KaoriosToolbox</string>
+    <string name="framework_not_imported">Framework no importado o falta FarewellToolbox</string>
 
     <!-- Tabs -->
     <string name="tab_home">Inicio</string>
@@ -91,14 +91,14 @@
     <string name="home_device_name_edit_title">Nombre mostrado del dispositivo</string>
     <string name="home_device_name_edit_hint">Déjalo vacío para usar el valor del sistema</string>
     <string name="home_hero_subtitle_edit_title">Subtítulo del hero</string>
-    <string name="home_hero_subtitle_edit_hint">Déjalo vacío para restaurar \"Mod by Kousei\"</string>
+    <string name="home_hero_subtitle_edit_hint">Déjalo vacío para restaurar \"Mod by Farewell\"</string>
     <string name="home_hero_image_title">Imagen del hero</string>
     <string name="home_hero_pick_gallery">Elegir de la galería</string>
     <string name="home_hero_reset">Usar predeterminada</string>
     <string name="avatar_hide_icon_title">Ocultar icono del avatar</string>
     <string name="avatar_hide_icon_desc">Centrar el nombre del dispositivo en la imagen hero</string>
     <string name="donate_title">Apoya al desarrollador</string>
-    <string name="donate_desc">Si Kaorios Toolbox te ha ayudado, considera una donación.</string>
+    <string name="donate_desc">Si Farewell Toolbox te ha ayudado, considera una donación.</string>
     <string name="donate_vcb">Vietcombank</string>
     <string name="tools_section_quotes">Grupo de soporte</string>
     <string name="settings_group_appearance">Apariencia</string>
@@ -134,7 +134,7 @@
     <string name="settings_suggest_enable_fallback">No se pudo guardar. Abre Ajustes de Toolbox: activa Fallback (root) u otorga «Modificar ajustes del sistema» abajo.</string>
     <string name="perm_section_title">Permisos</string>
     <string name="perm_modify_system_settings_title">Modificar ajustes del sistema</string>
-    <string name="perm_modify_system_settings_desc">Permite a Kaorios Toolbox modificar los ajustes del dispositivo.</string>
+    <string name="perm_modify_system_settings_desc">Permite a Farewell Toolbox modificar los ajustes del dispositivo.</string>
     <string name="perm_open_app_details_title">Información de la aplicación</string>
     <string name="perm_open_app_details_desc">Abre la página de ajustes del sistema de la aplicación.</string>
     <string name="perm_open_permissions_button">Permisos de la aplicación</string>
@@ -143,7 +143,7 @@
     <string name="main_color">Color principal</string>
     <string name="theme">Tema</string>
     <string name="language">Idioma</string>
-    <string name="author_desc">Desarrollador de Kaorios Toolbox</string>
+    <string name="author_desc">Desarrollador de Farewell Toolbox</string>
     <string name="not_found">No encontrado</string>
 
     <!-- Dialogs -->
@@ -178,7 +178,7 @@
     <string name="fallback_msg">Reserva: %1$s</string>
     <string name="device_banned">El dispositivo ha sido bloqueado por el administrador.</string>
     <string name="downloading_data">Descargando datos…</string>
-    <string name="framework_missing_msg">El framework debe parchearse con el controlador de KaoriosToolbox para funcionar.</string>
+    <string name="framework_missing_msg">El framework debe parchearse con el controlador de FarewellToolbox para funcionar.</string>
     <string name="download_release">Descargar versión</string>
     <string name="root_granted">Acceso root concedido</string>
     <string name="root_denied">Acceso root denegado o no encontrado</string>
@@ -214,7 +214,7 @@
     <string name="debug_mode_enabled_msg">Modo depuración activado</string>
     <string name="debug_mode_disabled_msg">Modo depuración desactivado</string>
     <string name="exit_app_title">¿Cerrar la aplicación?</string>
-    <string name="exit_app_message">Gracias por usar Kaorios Toolbox.</string>
+    <string name="exit_app_message">Gracias por usar Farewell Toolbox.</string>
     <string name="exit_app_confirm">Salir de la app</string>
 
     <string name="fwk_main_title">Sincronización del framework</string>
