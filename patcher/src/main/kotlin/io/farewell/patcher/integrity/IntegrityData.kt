@@ -9,9 +9,13 @@ object IntegrityData {
     private const val ROOT_URL = "https://android.googleapis.com/attestation/root"
     private const val STATUS_URL = "https://android.googleapis.com/attestation/status"
 
+    data class RevocationEntry(val status: String, val reason: String?) {
+        override fun toString(): String = if (reason.isNullOrEmpty()) status else "$status ($reason)"
+    }
+
     data class Snapshot(
         val rootPems: List<String>,
-        val revoked: Map<String, String>,
+        val statuses: Map<String, RevocationEntry>,
         val rootFile: File,
         val statusFile: File
     )
@@ -31,8 +35,8 @@ object IntegrityData {
 
     fun load(rootFile: File, statusFile: File): Snapshot {
         val rootPems = parseRoots(rootFile.readText())
-        val revoked = parseStatus(statusFile.readText())
-        return Snapshot(rootPems, revoked, rootFile, statusFile)
+        val statuses = parseStatus(statusFile.readText())
+        return Snapshot(rootPems, statuses, rootFile, statusFile)
     }
 
     private fun fetch(url: String): String {
@@ -51,8 +55,8 @@ object IntegrityData {
         } ?: emptyList()
     }
 
-    private fun parseStatus(json: String): Map<String, String> {
-        val result = LinkedHashMap<String, String>()
+    private fun parseStatus(json: String): Map<String, RevocationEntry> {
+        val result = LinkedHashMap<String, RevocationEntry>()
         val root = runCatching { org.json.JSONObject(json) }.getOrNull() ?: return result
         val entries = root.optJSONObject("entries") ?: return result
         val keys = entries.keys()
@@ -61,7 +65,7 @@ object IntegrityData {
             val entry = entries.optJSONObject(key) ?: continue
             val status = entry.optString("status", "")
             if (status.isNotEmpty()) {
-                result[key] = status
+                result[key] = RevocationEntry(status.uppercase(), entry.optString("reason", null))
             }
         }
         return result

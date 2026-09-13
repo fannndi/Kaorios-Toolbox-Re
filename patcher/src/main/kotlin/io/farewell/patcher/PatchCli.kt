@@ -38,7 +38,7 @@ fun main(args: Array<String>) {
 
     if (fetchIntegrity) {
         val snapshot = IntegrityData.download(INTEGRITY_DIR, force = true)
-        println("Google roots: ${snapshot.rootPems.size}, revoked entries: ${snapshot.revoked.size}")
+        println("Google roots: ${snapshot.rootPems.size}, status entries: ${snapshot.statuses.size}")
         println("root file: ${snapshot.rootFile.absolutePath}")
         println("status file: ${snapshot.statusFile.absolutePath}")
         return
@@ -46,7 +46,7 @@ fun main(args: Array<String>) {
 
     if (verifyKeybox != null) {
         val snapshot = IntegrityData.download(INTEGRITY_DIR)
-        val report = KeyboxVerifier.verify(verifyKeybox.readText(), snapshot.rootPems, snapshot.revoked)
+        val report = KeyboxVerifier.verify(verifyKeybox.readText(), snapshot.rootPems, snapshot.statuses)
         for (line in report.lines()) {
             println(line)
         }

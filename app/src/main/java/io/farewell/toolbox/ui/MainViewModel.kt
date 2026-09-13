@@ -31,6 +31,7 @@ data class PatchUiState(
     val dataVersion: String? = null,
     val dataMessage: String = "",
     val keyboxImported: Boolean = false,
+    val keyboxCount: Int = 0,
     val integrationMessage: String = ""
 )
 
@@ -43,7 +44,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _state = MutableStateFlow(
         PatchUiState(
             dataVersion = DataSync.cachedVersion(application),
-            keyboxImported = PlayIntegritySetup.keyboxImported(application)
+            keyboxImported = PlayIntegritySetup.keyboxImported(application),
+            keyboxCount = PlayIntegritySetup.keyboxFiles(application).size
         )
     )
     val state: StateFlow<PatchUiState> = _state
@@ -142,8 +144,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun refreshPlayIntegrity() {
         viewModelScope.launch {
-            _state.update { it.copy(busy = true, progress = "Re-syncing PIF and refreshing Play Store...") }
-            val result = PlayIntegritySetup.refresh(getApplication())
+            _state.update { it.copy(busy = true, progress = "Refreshing Play Integrity...") }
+            val result = PlayIntegritySetup.refresh(getApplication()) { message ->
+                _state.update { it.copy(progress = message) }
+            }
             _state.update {
                 it.copy(
                     busy = false,
@@ -153,6 +157,49 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     log = it.log + result.message
                 )
             }
+        }
+    }
+
+    fun pickHealthiestKeybox() {
+        viewModelScope.launch {
+            _state.update { it.copy(busy = true, progress = "Validating keyboxes against Google lists...") }
+            val report = PlayIntegritySetup.validateAndPickHealthiest(getApplication()) { message ->
+                _state.update { it.copy(progress = message.take(80)) }
+            }
+            _state.update {
+                it.copy(
+                    busy = false,
+                    progress = "",
+                    keyboxImported = PlayIntegritySetup.keyboxImported(getApplication()),
+                    keyboxCount = PlayIntegritySetup.keyboxFiles(getApplication()).size,
+                    integrationMessage = report,
+                    log = it.log + report
+                )
+            }
+        }
+    }
+
+    fun useNextKeybox() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val files = PlayIntegritySetup.keyboxFiles(getApplication())
+            val message = if (files.isEmpty()) {
+                "No keybox imported"
+            } else {
+                val next = (PlayIntegritySetup.activeKeyboxIndex(getApplication()) + 1) % files.size
+                if (PlayIntegritySetup.setActiveKeybox(getApplication(), next)) {
+                    "Active keybox #${next + 1} (${files[next].name})"
+                } else {
+                    "Keybox switch failed"
+                }
+            }
+            _state.update { it.copy(integrationMessage = message, log = it.log + message) }
+        }
+    }
+
+    fun analyzeVerdict(basic: Boolean, device: Boolean, strong: Boolean) {
+        viewModelScope.launch {
+            val message = IntegrityCheck.compareVerdict(getApplication(), basic, device, strong)
+            _state.update { it.copy(integrationMessage = message, log = it.log + message) }
         }
     }
 
@@ -210,7 +257,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             val message = try {
                 val xml = getApplication<android.app.Application>().contentResolver
                     .openInputStream(uri)?.use { it.readBytes().toString(Charsets.UTF_8) }
-                if (xml != null && PlayIntegritySetup.importKeybox(getApplication(), xml)) {
+                if (xml != null && PlayIntegritySetup.importKeybox(getApplication<android.app.Application>(), xml)) {
                     "Keybox imported"
                 } else {
                     "Invalid keybox XML (needs PrivateKey + Certificate)"
@@ -219,8 +266,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 "Keybox import failed: ${throwable.message}"
             }
             val imported = PlayIntegritySetup.keyboxImported(getApplication())
+            val count = PlayIntegritySetup.keyboxFiles(getApplication()).size
             _state.update {
-                it.copy(keyboxImported = imported, integrationMessage = message, log = it.log + message)
+                it.copy(
+                    keyboxImported = imported,
+                    keyboxCount = count,
+                    integrationMessage = message,
+                    log = it.log + message
+                )
             }
         }
     }

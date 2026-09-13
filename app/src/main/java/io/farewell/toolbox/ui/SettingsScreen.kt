@@ -4,6 +4,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -13,8 +14,14 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -42,7 +49,7 @@ fun SettingsScreen(state: PatchUiState, viewModel: MainViewModel, modifier: Modi
                     style = MaterialTheme.typography.bodySmall
                 )
                 Text(
-                    "Keybox: ${if (state.keyboxImported) "imported" else "not imported"}",
+                    "Keybox: ${if (state.keyboxImported) "active, ${state.keyboxCount} imported" else "not imported"}",
                     style = MaterialTheme.typography.bodySmall
                 )
                 Button(
@@ -81,6 +88,20 @@ fun SettingsScreen(state: PatchUiState, viewModel: MainViewModel, modifier: Modi
                     Text("Verify keybox (Google lists)")
                 }
                 OutlinedButton(
+                    onClick = { viewModel.pickHealthiestKeybox() },
+                    enabled = !state.busy && state.keyboxCount > 0,
+                    modifier = Modifier.padding(top = 8.dp)
+                ) {
+                    Text("Validate & pick healthiest keybox")
+                }
+                OutlinedButton(
+                    onClick = { viewModel.useNextKeybox() },
+                    enabled = !state.busy && state.keyboxCount > 1,
+                    modifier = Modifier.padding(top = 8.dp)
+                ) {
+                    Text("Use next keybox (soft-ban fallback)")
+                }
+                OutlinedButton(
                     onClick = { viewModel.checkReadiness() },
                     enabled = !state.busy,
                     modifier = Modifier.padding(top = 8.dp)
@@ -89,6 +110,38 @@ fun SettingsScreen(state: PatchUiState, viewModel: MainViewModel, modifier: Modi
                 }
                 if (state.integrationMessage.isNotEmpty()) {
                     Text(state.integrationMessage, style = MaterialTheme.typography.bodySmall)
+                }
+            }
+        }
+
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(16.dp)) {
+                Text("Verdict compare", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(
+                    "Play Store > developer options > Play Integrity > Check integrity, then mark the labels you got.",
+                    style = MaterialTheme.typography.bodySmall
+                )
+                var basic by remember { mutableStateOf(false) }
+                var device by remember { mutableStateOf(false) }
+                var strong by remember { mutableStateOf(false) }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Switch(checked = basic, onCheckedChange = { basic = it })
+                    Text("MEETS_BASIC_INTEGRITY", style = MaterialTheme.typography.bodySmall)
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Switch(checked = device, onCheckedChange = { device = it })
+                    Text("MEETS_DEVICE_INTEGRITY", style = MaterialTheme.typography.bodySmall)
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Switch(checked = strong, onCheckedChange = { strong = it })
+                    Text("MEETS_STRONG_INTEGRITY", style = MaterialTheme.typography.bodySmall)
+                }
+                Button(
+                    onClick = { viewModel.analyzeVerdict(basic, device, strong) },
+                    enabled = !state.busy,
+                    modifier = Modifier.padding(top = 8.dp)
+                ) {
+                    Text("Analyze verdict")
                 }
             }
         }

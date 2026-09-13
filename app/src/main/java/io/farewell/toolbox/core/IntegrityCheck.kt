@@ -21,7 +21,7 @@ object IntegrityCheck {
             return@withContext "Could not fetch Google lists: ${throwable.message}"
         }
         val report = try {
-            KeyboxVerifier.verify(keyboxFile.readText(), snapshot.rootPems, snapshot.revoked)
+            KeyboxVerifier.verify(keyboxFile.readText(), snapshot.rootPems, snapshot.statuses)
         } catch (throwable: Throwable) {
             return@withContext "Verification failed: ${throwable.message}"
         }
@@ -35,6 +35,41 @@ object IntegrityCheck {
             val root = org.json.JSONObject(status.readText())
             root.optJSONObject("entries")?.length() ?: 0
         }.getOrDefault(0)
+    }
+
+    fun compareVerdict(context: Context, basic: Boolean, device: Boolean, strong: Boolean): String {
+        val lines = mutableListOf<String>()
+        val keybox = PlayIntegritySetup.keyboxImported(context)
+        val pif = PlayIntegritySetup.loadPif(context)
+        val patch = pif?.optString("SECURITY_PATCH", "").orEmpty()
+        val sdk = android.os.Build.VERSION.SDK_INT
+        lines += "Play Store verdict: BASIC=$basic DEVICE=$device STRONG=$strong"
+        lines += "Our inputs: keybox=${if (keybox) "imported" else "missing"}, PIF patch=${patch.ifEmpty { "none" }}, Android $sdk"
+
+        if (!basic) {
+            lines += "BASIC failed: the app itself is likely not recognized (sideloaded) or Play Protect is off."
+            lines += "Install the build through Play (internal testing) if you need PLAY_RECOGNIZED."
+        }
+        if (basic && !device) {
+            lines += "DEVICE failed: check that PIF is applied (Apply Play Integrity setup), the patch is not older than the device patch,"
+            lines += "and that DroidGuard was restarted after applying (Refresh + clear Play Store). Run STRONG readiness check for details."
+        }
+        if (device && !strong) {
+            if (!keybox) {
+                lines += "STRONG failed and no keybox is imported: hardware-backed boot proof needs a keybox."
+            } else {
+                lines += "STRONG failed with a keybox present: verify the keybox (Google lists) - revoked, soft-banned or non-Google root"
+                lines += "are the usual causes. On Android 13+, an out-of-date PIF patch (>12 months) also breaks STRONG."
+            }
+        }
+        if (strong && keybox) {
+            lines += "STRONG matches our readiness model: hardware-backed signals are in place."
+        }
+        val cachedStatus = cachedStatusCount(context)
+        if (cachedStatus > 0) {
+            lines += "Google status list cache: $cachedStatus entries"
+        }
+        return lines.joinToString("\n")
     }
 
     suspend fun readinessReport(context: Context): String = withContext(Dispatchers.IO) {
@@ -74,7 +109,7 @@ object IntegrityCheck {
                 lines += "Keybox: could not fetch Google lists (${throwable.message})"
                 return@withContext lines.joinToString("\n")
             }
-            val report = KeyboxVerifier.verify(keyboxFile.readText(), snapshot.rootPems, snapshot.revoked)
+            val report = KeyboxVerifier.verify(keyboxFile.readText(), snapshot.rootPems, snapshot.statuses)
             lines += "Keybox: ${report.summary()}"
             lines += report.lines()
         } else {

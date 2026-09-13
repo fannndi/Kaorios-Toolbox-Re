@@ -1,6 +1,8 @@
 package io.farewell.toolbox.core
 
 import android.content.Context
+import io.farewell.patcher.integrity.IntegrityData
+import io.farewell.patcher.integrity.KeyboxVerifier
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
@@ -77,18 +79,115 @@ object PlayIntegritySetup {
         )
     }
 
-    suspend fun refresh(context: Context): PlayIntegrityResult = withContext(Dispatchers.IO) {
-        val sync = DataSync.sync(context, io.farewell.toolbox.BuildConfig.DATA_BASE_URL)
+    suspend fun refresh(context: Context, onProgress: (String) -> Unit = {}): PlayIntegrityResult = withContext(Dispatchers.IO) {
+        onProgress("Fetching latest PIF from Google OTA")
+        val live = PifAutoFetch.fetch(context, onProgress)
+        val syncNote = if (live != null) {
+            "PIF updated from ${live.source}"
+        } else {
+            val sync = DataSync.sync(context, io.farewell.toolbox.BuildConfig.DATA_BASE_URL)
+            sync.message
+        }
         val applied = apply(context, PlayIntegrityFlags())
         if (!applied.ok) {
             return@withContext applied
         }
         RootShell.run("am force-stop com.google.android.gms.unstable; am force-stop com.google.android.gms", 60)
         RootShell.run("pm clear com.android.vending", 120)
-        PlayIntegrityResult(true, "${applied.message}. GMS/Play Store refreshed (${sync.message})")
+        PlayIntegrityResult(true, "${applied.message}. $syncNote. GMS/Play Store refreshed")
     }
 
-    fun keyboxImported(context: Context): Boolean = File(context.filesDir, KEYBOX_FILE).exists()
+    fun keyboxImported(context: Context): Boolean = activeKeyboxFile(context).exists()
+
+    fun keyboxFiles(context: Context): List<File> {
+        val dir = File(context.filesDir, KEYBOX_DIR).apply { mkdirs() }
+        return dir.listFiles { file -> file.isFile && file.name.endsWith(".xml") }?.sortedBy { it.name } ?: emptyList()
+    }
+
+    fun activeKeyboxFile(context: Context): File = File(context.filesDir, KEYBOX_FILE)
+
+    fun activeKeyboxIndex(context: Context): Int {
+        val indexFile = File(context.filesDir, KEYBOX_INDEX)
+        return indexFile.takeIf { it.exists() }?.readText()?.trim()?.toIntOrNull() ?: 0
+    }
+
+    fun importKeybox(context: Context, xml: String): Boolean {
+        val trimmed = xml.trim()
+        if (!trimmed.contains("<Certificate>") || !trimmed.contains("<PrivateKey>")) {
+            return false
+        }
+        val dir = File(context.filesDir, KEYBOX_DIR).apply { mkdirs() }
+        var index = 1
+        while (File(dir, "keybox-$index.xml").exists()) {
+            index++
+        }
+        val stored = File(dir, "keybox-$index.xml")
+        stored.writeText(trimmed)
+        if (!activeKeyboxFile(context).exists()) {
+            setActiveKeybox(context, index - 1)
+        }
+        return true
+    }
+
+    fun setActiveKeybox(context: Context, index: Int): Boolean {
+        val files = keyboxFiles(context)
+        if (index !in files.indices) {
+            return false
+        }
+        val chosen = files[index]
+        activeKeyboxFile(context).writeText(chosen.readText())
+        File(context.filesDir, KEYBOX_INDEX).writeText(index.toString())
+        val write = writeSetting("sys_keybox_cfg", chosen.readText())
+        return write.code == 0
+    }
+
+    suspend fun validateAndPickHealthiest(context: Context, onProgress: (String) -> Unit): String =
+        withContext(Dispatchers.IO) {
+            val files = keyboxFiles(context)
+            if (files.isEmpty()) {
+                return@withContext "No keybox imported yet"
+            }
+            val snapshot = try {
+                IntegrityData.download(File(context.filesDir, "integrity-data"))
+            } catch (throwable: Throwable) {
+                return@withContext "Could not fetch Google lists: ${throwable.message}"
+            }
+            val summary = StringBuilder()
+            var bestIndex = -1
+            var bestRank = Int.MAX_VALUE
+            for ((index, file) in files.withIndex()) {
+                val report = try {
+                    KeyboxVerifier.verify(file.readText(), snapshot.rootPems, snapshot.statuses)
+                } catch (throwable: Throwable) {
+                    summary.append("#${index + 1}: error (${throwable.message})\n")
+                    continue
+                }
+                val revoked = report.leafRevocation?.contains("REVOKED") == true
+                val rank = when {
+                    report.problems.isNotEmpty() -> 30
+                    revoked -> 20
+                    report.chainValid && report.warnings.isEmpty() -> 0
+                    report.chainValid -> 5
+                    else -> 10
+                }
+                summary.append("#${index + 1} (${file.name}): ${report.summary()}\n")
+                if (rank < bestRank) {
+                    bestRank = rank
+                    bestIndex = index
+                }
+            }
+            if (bestIndex >= 0) {
+                val applied = setActiveKeybox(context, bestIndex)
+                summary.append("Selected keybox #${bestIndex + 1}")
+                if (!applied) {
+                    summary.append(" (setting write failed)")
+                }
+            } else {
+                summary.append("No usable keybox found")
+            }
+            onProgress(summary.toString())
+            summary.toString()
+        }
 
     fun loadPif(context: Context): JSONObject? {
         val pifFile = File(context.filesDir, "farewell-data/Pif-props.json")
@@ -98,15 +197,6 @@ object PlayIntegritySetup {
                 JSONObject(context.assets.open("Pif-props.json").use { it.readBytes().toString(Charsets.UTF_8) })
             }.getOrNull()
         }
-    }
-
-    fun importKeybox(context: Context, xml: String): Boolean {
-        val trimmed = xml.trim()
-        if (!trimmed.contains("<Certificate>") || !trimmed.contains("<PrivateKey>")) {
-            return false
-        }
-        File(context.filesDir, KEYBOX_FILE).writeText(trimmed)
-        return true
     }
 
     fun buildPropOverlay(context: Context): String? {
@@ -330,4 +420,6 @@ object PlayIntegritySetup {
     }
 
     private const val KEYBOX_FILE = "ks2-keybox.xml"
+    private const val KEYBOX_DIR = "keyboxes"
+    private const val KEYBOX_INDEX = "keybox-active.txt"
 }

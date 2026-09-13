@@ -77,7 +77,11 @@ object KeyboxVerifier {
         return certificates
     }
 
-    fun verify(xml: String, rootPems: List<String>, revoked: Map<String, String>): KeyboxReport {
+    fun verify(
+        xml: String,
+        rootPems: List<String>,
+        statuses: Map<String, IntegrityData.RevocationEntry>
+    ): KeyboxReport {
         val problems = mutableListOf<String>()
         val warnings = mutableListOf<String>()
 
@@ -152,9 +156,20 @@ object KeyboxVerifier {
             }
         }
 
-        val leafRevocation = statusFor(certificates[0].serialNumber, revoked)
+        val leafRevocation = statusFor(certificates[0].serialNumber, statuses)?.toString()
         if (leafRevocation != null) {
-            problems += "Leaf certificate is ${leafRevocation.uppercase()} in Google's status list"
+            problems += "Leaf certificate is listed in Google's status list: $leafRevocation"
+        }
+        for ((index, certificate) in certificates.withIndex()) {
+            if (index == 0) continue
+            val entry = statusFor(certificate.serialNumber, statuses)
+            if (entry != null) {
+                if (entry.status == "REVOKED") {
+                    problems += "Certificate $index is revoked (${entry.reason ?: "no reason"})"
+                } else {
+                    warnings += "Certificate $index has status ${entry.status} (${entry.reason ?: "no reason"})"
+                }
+            }
         }
 
         val attestation = extractAttestation(certificates[0])
@@ -187,10 +202,13 @@ object KeyboxVerifier {
         )
     }
 
-    private fun statusFor(serial: BigInteger, revoked: Map<String, String>): String? {
+    private fun statusFor(
+        serial: BigInteger,
+        statuses: Map<String, IntegrityData.RevocationEntry>
+    ): IntegrityData.RevocationEntry? {
         val decimal = serial.toString(10)
         val hex = serial.toString(16)
-        return revoked[decimal] ?: revoked[hex] ?: revoked[hex.uppercase()] ?: revoked["0x$hex"]
+        return statuses[decimal] ?: statuses[hex] ?: statuses[hex.uppercase()] ?: statuses["0x$hex"]
     }
 
     private fun extractAttestation(certificate: X509Certificate): AttestationInfo? {
