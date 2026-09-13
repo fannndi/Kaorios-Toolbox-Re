@@ -9,8 +9,21 @@ object IntegrityData {
     private const val ROOT_URL = "https://android.googleapis.com/attestation/root"
     private const val STATUS_URL = "https://android.googleapis.com/attestation/status"
 
-    data class RevocationEntry(val status: String, val reason: String?) {
-        override fun toString(): String = if (reason.isNullOrEmpty()) status else "$status ($reason)"
+    data class RevocationEntry(
+        val status: String,
+        val reason: String?,
+        val comment: String? = null,
+        val expires: String? = null
+    ) {
+        val softBanned: Boolean get() = status == "SUSPENDED"
+
+        override fun toString(): String {
+            val parts = mutableListOf(status)
+            if (!reason.isNullOrEmpty()) parts += reason
+            if (!expires.isNullOrEmpty()) parts += "expires $expires"
+            if (!comment.isNullOrEmpty()) parts += comment
+            return parts.joinToString(", ")
+        }
     }
 
     data class Snapshot(
@@ -65,7 +78,12 @@ object IntegrityData {
             val entry = entries.optJSONObject(key) ?: continue
             val status = entry.optString("status", "")
             if (status.isNotEmpty()) {
-                result[key] = RevocationEntry(status.uppercase(), entry.optString("reason", null))
+                result[key] = RevocationEntry(
+                    status = status.uppercase(),
+                    reason = entry.optString("reason", null),
+                    comment = entry.optString("comment", null),
+                    expires = entry.optString("expires", null)
+                )
             }
         }
         return result

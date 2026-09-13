@@ -119,6 +119,7 @@ object AttestationParser {
                 applicationDigests = applicationDigests
             )
         } catch (throwable: Throwable) {
+            System.err.println("attestation parse failed: $throwable")
             null
         }
     }

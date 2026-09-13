@@ -116,6 +116,26 @@ fun SettingsScreen(state: PatchUiState, viewModel: MainViewModel, modifier: Modi
 
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp)) {
+                Text("Automation", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Switch(checked = state.autoRefresh, onCheckedChange = { viewModel.setAutoRefresh(it) })
+                    Text("Auto-refresh every 6h (PIF + keybox health)", style = MaterialTheme.typography.bodySmall)
+                }
+                if (state.autoRefreshLast.isNotEmpty()) {
+                    Text("Last run: ${state.autoRefreshLast}", style = MaterialTheme.typography.bodySmall)
+                }
+                OutlinedButton(
+                    onClick = { viewModel.runAutoRefreshNow() },
+                    enabled = !state.busy,
+                    modifier = Modifier.padding(top = 8.dp)
+                ) {
+                    Text("Run auto-refresh now")
+                }
+            }
+        }
+
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(16.dp)) {
                 Text("Verdict compare", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 Text(
                     "Play Store > developer options > Play Integrity > Check integrity, then mark the labels you got.",

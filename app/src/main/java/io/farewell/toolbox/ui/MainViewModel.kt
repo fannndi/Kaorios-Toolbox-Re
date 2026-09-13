@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import io.farewell.toolbox.BuildConfig
+import io.farewell.toolbox.core.AutoRefresh
 import io.farewell.toolbox.core.DataSync
 import io.farewell.toolbox.core.DeviceProfileInfo
 import io.farewell.toolbox.core.IntegrityCheck
@@ -32,6 +33,8 @@ data class PatchUiState(
     val dataMessage: String = "",
     val keyboxImported: Boolean = false,
     val keyboxCount: Int = 0,
+    val autoRefresh: Boolean = false,
+    val autoRefreshLast: String = "",
     val integrationMessage: String = ""
 )
 
@@ -45,7 +48,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         PatchUiState(
             dataVersion = DataSync.cachedVersion(application),
             keyboxImported = PlayIntegritySetup.keyboxImported(application),
-            keyboxCount = PlayIntegritySetup.keyboxFiles(application).size
+            keyboxCount = PlayIntegritySetup.keyboxFiles(application).size,
+            autoRefresh = AutoRefresh.isEnabled(application),
+            autoRefreshLast = AutoRefresh.lastResult(application)
         )
     )
     val state: StateFlow<PatchUiState> = _state
@@ -193,6 +198,20 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
             _state.update { it.copy(integrationMessage = message, log = it.log + message) }
+        }
+    }
+
+    fun setAutoRefresh(enabled: Boolean) {
+        AutoRefresh.setEnabled(getApplication(), enabled)
+        _state.update { it.copy(autoRefresh = enabled, autoRefreshLast = AutoRefresh.lastResult(getApplication())) }
+    }
+
+    fun runAutoRefreshNow() {
+        viewModelScope.launch {
+            _state.update { it.copy(busy = true, progress = "Running auto-refresh now...") }
+            val message = AutoRefresh.runNow(getApplication())
+            AutoRefresh.storeResult(getApplication(), message)
+            _state.update { it.copy(busy = false, progress = "", autoRefreshLast = message, log = it.log + message) }
         }
     }
 

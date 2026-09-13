@@ -11,6 +11,7 @@ data class KeyboxReport(
     val rootSubject: String?,
     val leafSerialHex: String?,
     val leafRevocation: String?,
+    val softBanned: Boolean,
     val attestation: AttestationInfo?,
     val problems: List<String>,
     val warnings: List<String>
@@ -55,6 +56,7 @@ data class KeyboxReport(
     fun summary(): String {
         val state = when {
             problems.isNotEmpty() -> "invalid"
+            softBanned -> "soft-banned"
             leafRevocation != null -> "revoked"
             chainValid -> "valid"
             else -> "unknown"
@@ -94,6 +96,7 @@ object KeyboxVerifier {
                 rootSubject = null,
                 leafSerialHex = null,
                 leafRevocation = null,
+                softBanned = false,
                 attestation = null,
                 problems = listOf("Cannot parse keybox certificates: ${throwable.message}"),
                 warnings = emptyList()
@@ -101,7 +104,17 @@ object KeyboxVerifier {
         }
 
         if (certificates.isEmpty()) {
-            return KeyboxReport(false, 0, null, null, null, null, listOf("No certificates in keybox"), emptyList())
+            return KeyboxReport(
+                chainValid = false,
+                chainLength = 0,
+                rootSubject = null,
+                leafSerialHex = null,
+                leafRevocation = null,
+                softBanned = false,
+                attestation = null,
+                problems = listOf("No certificates in keybox"),
+                warnings = emptyList()
+            )
         }
 
         val roots = rootPems.mapNotNull { pem ->
@@ -127,17 +140,19 @@ object KeyboxVerifier {
         var rootSubject: String? = null
         val last = certificates.last()
         for (root in roots) {
-            if (last.subjectX500Principal == root.subjectX500Principal) {
-                rootSubject = root.subjectX500Principal.name
-                chainValid = true
-                problems.removeAll { it.startsWith("Certificate ${certificates.size - 1}") }
-                break
-            }
-            try {
-                last.verify(root.publicKey)
-                rootSubject = root.subjectX500Principal.name
-                break
+            val anchored = try {
+                if (last.encoded.contentEquals(root.encoded)) {
+                    true
+                } else {
+                    last.verify(root.publicKey)
+                    true
+                }
             } catch (ignored: Throwable) {
+                false
+            }
+            if (anchored) {
+                rootSubject = root.subjectX500Principal.name
+                break
             }
         }
         if (rootSubject == null) {
@@ -151,14 +166,21 @@ object KeyboxVerifier {
             } catch (throwable: Throwable) {
                 warnings += "Certificate $index validity: ${throwable.message}"
             }
-            if (index < certificates.size - 1 && certificate.basicConstraints < 0) {
+            if (index >= 1 && certificate.basicConstraints < 0) {
                 warnings += "Certificate $index is not a CA but is used as issuer"
             }
         }
 
-        val leafRevocation = statusFor(certificates[0].serialNumber, statuses)?.toString()
+        val leafEntry = statusFor(certificates[0].serialNumber, statuses)
+        val leafRevocation = leafEntry?.toString()
         if (leafRevocation != null) {
-            problems += "Leaf certificate is listed in Google's status list: $leafRevocation"
+            if (leafEntry!!.status == "REVOKED") {
+                problems += "Leaf certificate is listed in Google's status list: $leafRevocation"
+            } else if (leafEntry.softBanned) {
+                warnings += "Leaf certificate is SUSPENDED (soft-banned): $leafRevocation"
+            } else {
+                warnings += "Leaf certificate has status: $leafRevocation"
+            }
         }
         for ((index, certificate) in certificates.withIndex()) {
             if (index == 0) continue
@@ -166,8 +188,10 @@ object KeyboxVerifier {
             if (entry != null) {
                 if (entry.status == "REVOKED") {
                     problems += "Certificate $index is revoked (${entry.reason ?: "no reason"})"
+                } else if (entry.softBanned) {
+                    warnings += "Certificate $index is SUSPENDED (soft-banned): $entry"
                 } else {
-                    warnings += "Certificate $index has status ${entry.status} (${entry.reason ?: "no reason"})"
+                    warnings += "Certificate $index has status: $entry"
                 }
             }
         }
@@ -196,6 +220,7 @@ object KeyboxVerifier {
             rootSubject = rootSubject,
             leafSerialHex = certificates[0].serialNumber.toString(16),
             leafRevocation = leafRevocation,
+            softBanned = leafEntry?.softBanned == true,
             attestation = attestation,
             problems = problems,
             warnings = warnings
@@ -214,11 +239,9 @@ object KeyboxVerifier {
     private fun extractAttestation(certificate: X509Certificate): AttestationInfo? {
         return try {
             val wrapped = certificate.getExtensionValue(AttestationParser.ATTESTATION_OID) ?: return null
-            val outerReader = DerReader(wrapped)
-            val outer = outerReader.read()
-            val inner = DerReader(wrapped, outer.contentStart, outer.contentEnd)
-            val value = inner.read()
-            AttestationParser.parse(inner.content(value))
+            val outer = DerReader(wrapped).read()
+            val keyDescription = wrapped.copyOfRange(outer.contentStart, outer.contentEnd)
+            AttestationParser.parse(keyDescription)
         } catch (throwable: Throwable) {
             null
         }

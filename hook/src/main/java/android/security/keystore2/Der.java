@@ -71,11 +71,7 @@ final class Der {
             }
             shift -= 7;
         }
-        return tlv(tagBytes.toByteArray()[0], concat(
-                slice(tagBytes.toByteArray(), 1),
-                lengthPrefix(content.length),
-                content
-        ));
+        return concat(tagBytes.toByteArray(), lengthPrefix(content.length), content);
     }
 
     private static byte[] slice(byte[] data, int from) {
