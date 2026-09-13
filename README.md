@@ -37,6 +37,19 @@ The app detects device codename, MIUI version and Android API, then picks the pr
 - Keybox XML can be imported from the device and is stored in `sys_keybox_cfg`. `KeyboxEngine` now also implements the software keypair path: when an app requests hardware attestation (`KeyGenParameterSpec` with an attestation challenge), the hook generates a P-256 keypair and a fresh X.509 leaf certificate containing a KeyDescription attestation extension (verified boot state, locked bootloader, OS/patch levels, attestation application id) signed by the keybox private key, then returns `[newLeaf, keybox chain...]` for `engineGetCertificate` / `engineGetCertificateChain` through an alias cache.
 - `Build` fields are also unfinalized and spoofed in `system_server` (`initSystemServer`) so GMS/Play Store checks in system processes see the same identity.
 
+### Rootless adaptation (no Zygisk)
+
+AlwaysStrong / TEESimulator + PlayIntegrityFork require a Zygisk implementation because they inject into zygote at runtime. This project does not: the hook lives inside the boot-classpath jars (`framework.jar` / `services.jar`), so it already runs inside every app and system process. No zygote injection, no companion process, no Zygisk module.
+
+What was adopted from AlwaysStrong's strategy:
+
+- **Prop unification**: `ro.product.brand/name/device/model/manufacturer`, `ro.product.system.model`, `ro.build.product`, `ro.build.description` (reconstructed from the fingerprint), `ro.build.tags/type`, `ro.system.build.tags/type`, and the OEM leak scrub (`ro.product.{odm,vendor,product,system_ext}.{model,brand,manufacturer,device,name}` returned empty) for every target package.
+- **Security-patch sync**: `ro.build.version.security_patch`, `ro.vendor.build.security_patch`, `ro.system.build.version.security_patch` and the attestation `osPatchLevel`/`vendorPatchLevel`/`bootPatchLevel` all use the PIF patch (never moving the device patch backwards).
+- **Target list**: Play Store, GMS/GSF and the common attestation checkers (`vvb2060.keyattestation`, `nativecheck`, `riskdetector`, `luna.safe.luna`, …).
+- **Refresh action**: `Refresh + clear Play Store` re-syncs the PIF data, re-applies the config, force-stops DroidGuard and clears the Play Store so a new fingerprint/keybox takes effect without rebooting.
+
+Known limitation of the rootless model: native property reads (`__system_property_get` used by DroidGuard's native code) cannot be intercepted from framework Java; Zygisk/PLT hooks would be required for that layer. Java-level reads (`SystemProperties.get/getInt/getLong/getBoolean`, `Build` fields) are covered.
+
 ## 🛠️ Building
 
 Requirements: JDK 17+ and Android SDK (platform 37, build-tools 36/37).

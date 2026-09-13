@@ -29,7 +29,8 @@ final class AttestationBuilder {
             byte[] issuerDer,
             byte[] subjectDer,
             byte[] challenge,
-            String packageName
+            String packageName,
+            int patchLevel
     ) {
         try {
             ECPublicKey publicKey = (ECPublicKey) keyPair.getPublic();
@@ -49,7 +50,7 @@ final class AttestationBuilder {
             byte[] signatureAlgorithm = Der.sequence(Der.oid(rsaKeybox ? RSA_SHA256_OID : ECDSA_SHA256_OID));
             BigInteger serial = new BigInteger(63, new Random());
 
-            byte[] keyDescription = keyDescription(challenge, packageName);
+            byte[] keyDescription = keyDescription(challenge, packageName, patchLevel);
 
             byte[] extensions = Der.explicit(3, Der.sequence(
                     Der.sequence(
@@ -84,8 +85,10 @@ final class AttestationBuilder {
         }
     }
 
-    private static byte[] keyDescription(byte[] challenge, String packageName) {
-        int patchLevel = patchLevel();
+    private static byte[] keyDescription(byte[] challenge, String packageName, int patchLevel) {
+        if (patchLevel <= 0) {
+            patchLevel = patchLevel();
+        }
 
         byte[] softwareEnforced = Der.sequence(
                 Der.explicit(1, Der.set(Der.integer(2))),

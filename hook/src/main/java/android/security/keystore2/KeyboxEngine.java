@@ -74,7 +74,8 @@ public final class KeyboxEngine {
                     material.subjectDer,
                     material.subjectDer,
                     challenge,
-                    HookState.currentPackage()
+                    HookState.currentPackage(),
+                    resolvePatchLevel(config, HookState.currentPackage())
             );
             if (leaf == null) {
                 return null;
@@ -132,6 +133,18 @@ public final class KeyboxEngine {
             HookLog.e("replaceChain", throwable);
             return chain;
         }
+    }
+
+    private static int resolvePatchLevel(HookConfig config, String packageName) {
+        try {
+            String value = config.securityPatch(packageName);
+            if (value != null && value.length() >= 7) {
+                return Integer.parseInt(value.substring(0, 4)) * 100
+                        + Integer.parseInt(value.substring(5, 7));
+            }
+        } catch (Throwable ignored) {
+        }
+        return 0;
     }
 
     private static String readKeybox(Context context) {

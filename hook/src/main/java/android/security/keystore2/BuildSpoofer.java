@@ -13,8 +13,10 @@ public final class BuildSpoofer {
             "BRAND_FOR_ATTESTATION",
             "DEVICE",
             "DEVICE_FOR_ATTESTATION",
+            "DISPLAY",
             "FINGERPRINT",
             "HARDWARE",
+            "HOST",
             "ID",
             "MANUFACTURER",
             "MANUFACTURER_FOR_ATTESTATION",
@@ -33,6 +35,7 @@ public final class BuildSpoofer {
             "RELEASE_OR_CODENAME",
             "RELEASE_OR_PREVIEW_DISPLAY",
             "SECURITY_PATCH",
+            "INCREMENTAL",
             "DEVICE_INITIAL_SDK_INT"
     };
 

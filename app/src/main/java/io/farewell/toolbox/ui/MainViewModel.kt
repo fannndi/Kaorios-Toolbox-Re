@@ -139,6 +139,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun refreshPlayIntegrity() {
+        viewModelScope.launch {
+            _state.update { it.copy(busy = true, progress = "Re-syncing PIF and refreshing Play Store...") }
+            val result = PlayIntegritySetup.refresh(getApplication())
+            _state.update {
+                it.copy(
+                    busy = false,
+                    progress = "",
+                    integrationMessage = result.message,
+                    dataVersion = DataSync.cachedVersion(getApplication()),
+                    log = it.log + result.message
+                )
+            }
+        }
+    }
+
     fun importKeybox(uri: android.net.Uri) {
         viewModelScope.launch(Dispatchers.IO) {
             val message = try {

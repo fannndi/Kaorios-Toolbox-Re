@@ -116,6 +116,21 @@ public final class HookConfig {
         return flag("keybox_spoof");
     }
 
+    public String securityPatch(String packageName) {
+        String value = propOverride(packageName, "ro.build.version.security_patch");
+        if (value != null && !value.isEmpty()) {
+            return value;
+        }
+        JSONObject build = buildOverride(packageName);
+        if (build != null) {
+            String patch = build.optString("SECURITY_PATCH", null);
+            if (patch != null && !patch.isEmpty()) {
+                return patch;
+            }
+        }
+        return null;
+    }
+
     public JSONObject buildOverride(String packageName) {
         JSONObject build = root.optJSONObject("build");
         if (build == null) {

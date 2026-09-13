@@ -85,6 +85,10 @@ public final class KeyStoreHooks {
         return PropSpoofer.filter(key, value);
     }
 
+    public static String propOverride(String key) {
+        return PropSpoofer.override(key);
+    }
+
     public static Certificate[] CertificateChainForAlias(String alias) {
         return KeyboxEngine.chainForAlias(alias);
     }

@@ -80,6 +80,10 @@ object Asm {
 
     fun moveResult(register: Int) = BuilderInstruction11x(Opcode.MOVE_RESULT, register)
 
+    fun moveResultWide(register: Int) = BuilderInstruction11x(Opcode.MOVE_RESULT_WIDE, register)
+
+    fun returnWide(register: Int) = BuilderInstruction11x(Opcode.RETURN_WIDE, register)
+
     fun returnObject(register: Int) = BuilderInstruction11x(Opcode.RETURN_OBJECT, register)
 
     fun returnInt(register: Int) = BuilderInstruction11x(Opcode.RETURN, register)

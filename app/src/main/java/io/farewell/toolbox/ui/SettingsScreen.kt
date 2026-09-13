@@ -52,6 +52,13 @@ fun SettingsScreen(state: PatchUiState, viewModel: MainViewModel, modifier: Modi
                 ) {
                     Text("Apply Play Integrity setup")
                 }
+                Button(
+                    onClick = { viewModel.refreshPlayIntegrity() },
+                    enabled = !state.busy,
+                    modifier = Modifier.padding(top = 8.dp)
+                ) {
+                    Text("Refresh + clear Play Store")
+                }
                 OutlinedButton(
                     onClick = { keyboxPicker.launch("*/*") },
                     enabled = !state.busy,
