@@ -6,6 +6,8 @@ framework.jar
 node_modules/
 Toolbox-patcher/framework_patched.jar
 # Toolbox-patcher/framework_decompile/
+Toolbox-patcher/framework_decompile/
+Toolbox-patcher/services_decompile/
 Toolbox-patcher/backup/
 .vscode/
 # Module creation build artifacts
@@ -18,3 +20,6 @@ Toolbox-patcher/temp_apk_extract/
 __pycache__/
 *.pyc
 Toolbox-patcher/.it_tmp/
+
+# Assistant workspace state (local notes, not project source)
+.workbuddy-ai/

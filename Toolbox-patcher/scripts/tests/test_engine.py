@@ -2,13 +2,18 @@
 """
 test_engine.py - self-check for smali_engine.py
 
-Builds a miniature framework.jar layout that deliberately uses register
-numbers the *old* patcher could not handle, then asserts that the engine
+Builds miniature framework trees that deliberately use register layouts the
+*old* patcher could not handle, then asserts the engine gets them right.
 
-  1. grows `.registers` when a method has no free locals,
-  2. resolves parameter registers from the descriptor,
-  3. finds the anchor without hardcoded v0/v1/v4,
-  4. is idempotent.
+Covered:
+  legacy profile   frame growth when a method has no free locals, parameter
+                   resolution from the descriptor, and anchor matching without
+                   hardcoded v0/v1/v4.
+  modern profile   the generateKeyPair() case where growing the frame would
+                   push `this` to v16 and break the 4-bit invoke encoding, so
+                   the engine must reuse an existing local instead.
+  services artifact the whole-file `before-invoke` anchor used by SystemServer.
+  general          idempotency, and injection into the highest smali bucket.
 
 Run with:  python3 scripts/tests/test_engine.py
 """
@@ -24,12 +29,12 @@ import tempfile
 HERE = os.path.dirname(os.path.abspath(__file__))
 ENGINE = os.path.abspath(os.path.join(HERE, "..", "lib", "smali_engine.py"))
 
+HOOK_STUB = ".class public final Lcom/android/internal/util/kaorios/KaoriPropsUtils;\n"
+
 # --------------------------------------------------------------------------
-# Fixtures: note the register counts. hasSystemFeature has ZERO free locals,
-# which is exactly the case the previous patcher corrupted.
+# Shared fixtures
 # --------------------------------------------------------------------------
-FIXTURES = {
-    "smali/android/app/Instrumentation.smali": """\
+INSTRUMENTATION = """\
 .class public Landroid/app/Instrumentation;
 .super Ljava/lang/Object;
 
@@ -48,8 +53,11 @@ FIXTURES = {
 
     return-object v0
 .end method
-""",
-    "smali/android/app/ApplicationPackageManager.smali": """\
+"""
+
+# `.registers 3` and three parameters means there are ZERO free locals. The old
+# patcher wrote to v0/v1 here, which are p0 and p1.
+APPLICATION_PACKAGE_MANAGER = """\
 .class public Landroid/app/ApplicationPackageManager;
 .super Ljava/lang/Object;
 
@@ -62,20 +70,9 @@ FIXTURES = {
 
     return p0
 .end method
-""",
-    "smali/android/security/KeyStore2.smali": """\
-.class public Landroid/security/KeyStore2;
-.super Ljava/lang/Object;
+"""
 
-.method public getKeyEntry(Landroid/system/keystore2/KeyDescriptor;)Landroid/system/keystore2/KeyEntryResponse;
-    .registers 3
-
-    const/4 v0, 0x0
-
-    return-object v0
-.end method
-""",
-    "smali/android/security/keystore2/AndroidKeyStoreSpi.smali": """\
+ANDROID_KEY_STORE_SPI = """\
 .class public Landroid/security/keystore2/AndroidKeyStoreSpi;
 .super Ljava/security/KeyStoreSpi;
 
@@ -92,16 +89,80 @@ FIXTURES = {
 
     return-object v3
 .end method
-""",
+"""
+
+KEYSTORE2 = """\
+.class public Landroid/security/KeyStore2;
+.super Ljava/lang/Object;
+
+.method public getKeyEntry(Landroid/system/keystore2/KeyDescriptor;)Landroid/system/keystore2/KeyEntryResponse;
+    .registers 3
+
+    const/4 v0, 0x0
+
+    return-object v0
+.end method
+"""
+
+LEGACY_FIXTURES = {
+    "smali/android/app/Instrumentation.smali": INSTRUMENTATION,
+    "smali/android/app/ApplicationPackageManager.smali": APPLICATION_PACKAGE_MANAGER,
+    "smali/android/security/KeyStore2.smali": KEYSTORE2,
+    "smali/android/security/keystore2/AndroidKeyStoreSpi.smali": ANDROID_KEY_STORE_SPI,
+}
+
+# 16 registers with a single parameter: `this` lives in v15. Growing the frame
+# would move it to v16, which does not fit a 35c invoke operand.
+KEY_PAIR_GENERATOR_SPI = """\
+.class public abstract Landroid/security/keystore2/AndroidKeyStoreKeyPairGeneratorSpi;
+.super Ljava/security/KeyPairGeneratorSpi;
+
+.method public generateKeyPair()Ljava/security/KeyPair;
+    .registers 16
+
+    const/4 v0, 0x0
+
+    return-object v9
+.end method
+"""
+
+SYSTEM_SERVER = """\
+.class public final Lcom/android/server/SystemServer;
+.super Ljava/lang/Object;
+
+.method private run()V
+    .registers 2
+
+    invoke-direct {p0, p1}, Lcom/android/server/SystemServer;->startOtherServices(Lcom/android/server/utils/TimingsTraceAndSlog;)V
+
+    return-void
+.end method
+"""
+
+MODERN_FIXTURES = {
+    "smali/android/app/Instrumentation.smali": INSTRUMENTATION,
+    "smali/android/app/ApplicationPackageManager.smali": APPLICATION_PACKAGE_MANAGER,
+    "smali/android/security/keystore2/AndroidKeyStoreSpi.smali": ANDROID_KEY_STORE_SPI,
+    "smali/android/security/keystore2/AndroidKeyStoreKeyPairGeneratorSpi.smali": KEY_PAIR_GENERATOR_SPI,
+}
+
+SERVICES_FIXTURES = {
+    "smali/com/android/server/SystemServer.smali": SYSTEM_SERVER,
 }
 
 
-def build_tree(root: str) -> str:
-    for rel, content in FIXTURES.items():
+def build_tree(fixtures: dict[str, str]) -> str:
+    root = tempfile.mkdtemp(prefix="kaorios_engine_test_")
+    for rel, content in fixtures.items():
         path = os.path.join(root, *rel.split("/"))
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, "w", encoding="utf-8", newline="\n") as fh:
             fh.write(content)
+
+    source = os.path.join(root, "_hooks")
+    os.makedirs(source, exist_ok=True)
+    with open(os.path.join(source, "KaoriPropsUtils.smali"), "w", encoding="utf-8") as fh:
+        fh.write(HOOK_STUB)
     return root
 
 
@@ -111,97 +172,148 @@ def read(root: str, rel: str) -> str:
 
 
 def run(*args: str) -> subprocess.CompletedProcess:
-    return subprocess.run(
-        [sys.executable, ENGINE, *args],
-        capture_output=True,
-        text=True,
-    )
+    return subprocess.run([sys.executable, ENGINE, *args], capture_output=True, text=True)
 
 
-def main() -> int:
-    root = tempfile.mkdtemp(prefix="kaorios_engine_test_")
-    failures: list[str] = []
+class Checker:
+    def __init__(self) -> None:
+        self.failures: list[str] = []
 
+    def check(self, label: str, ok: bool) -> None:
+        if not ok:
+            self.failures.append(label)
+
+    def equals(self, label: str, actual: object, expected: object) -> None:
+        if actual != expected:
+            self.failures.append("%s: expected %r, got %r" % (label, expected, actual))
+
+
+def test_legacy(c: Checker) -> None:
+    root = build_tree(LEGACY_FIXTURES)
     try:
-        build_tree(root)
-
-        # A fake hook-class source dir.
         source = os.path.join(root, "_hooks")
-        os.makedirs(source, exist_ok=True)
-        with open(os.path.join(source, "KaoriPropsUtils.smali"), "w", encoding="utf-8") as fh:
-            fh.write(".class public final Lcom/android/internal/util/kaorios/KaoriPropsUtils;\n")
 
-        # -- inject --------------------------------------------------------
         res = run("inject", "--decompile-dir", root, "--source", source)
-        if res.returncode != 0:
-            failures.append("inject failed: %s%s" % (res.stdout, res.stderr))
-        injected = os.path.join(
-            root, "smali", "com", "android", "internal", "util", "kaorios", "KaoriPropsUtils.smali"
-        )
-        if not os.path.isfile(injected):
-            failures.append("hook class was not injected")
+        c.equals("legacy inject exit code", res.returncode, 0)
 
-        # -- patch ---------------------------------------------------------
-        res = run("patch", "--decompile-dir", root, "--sdk", "31")
-        if res.returncode != 0:
-            failures.append("patch returned %d\n%s%s" % (res.returncode, res.stdout, res.stderr))
-        print("--- first run ---")
+        res = run("patch", "--decompile-dir", root, "--profile", "legacy", "--sdk", "31")
+        print("--- legacy, first run ---")
         print(res.stdout.strip())
+        c.equals("legacy patch exit code", res.returncode, 0)
 
         apm = read(root, "smali/android/app/ApplicationPackageManager.smali")
         inst = read(root, "smali/android/app/Instrumentation.smali")
         ks2 = read(root, "smali/android/security/KeyStore2.smali")
         spi = read(root, "smali/android/security/keystore2/AndroidKeyStoreSpi.smali")
 
-        checks = [
-            ("frame grown to .registers 5", ".registers 5" in apm),
-            ("feature override hook present", "KaoriFeatureOverrides;->getOverride" in apm),
-            # After growth the frame is v0,v1 locals | v2=this, v3=String, v4=int.
-            ("feature override args are (mContext, p1, pkg)", "invoke-static {v1, v3, v0}" in apm),
-            ("try/catch guard present", ".catchall {:try_start_kaorios" in apm),
-            ("Context init hook present", "KaoriProps(Landroid/content/Context;)V" in inst),
-            ("first overload passes v2", "invoke-static {v2}, Lcom/android/internal/util/kaorios/KaoriPropsUtils;" in inst),
-            ("second overload passes v3", "invoke-static {v3}, Lcom/android/internal/util/kaorios/KaoriPropsUtils;" in inst),
-            ("keybox hook present", "KaoriGetKeyEntry" in ks2),
-            ("cert chain marker present", "KaoriGetCertificateChain()V" in spi),
-            ("cert chain swap present", "KaoriGetCertificateChain([Ljava/security/cert/Certificate;)" in spi),
-            ("cert chain swap reuses v3", "move-result-object v3" in spi),
-        ]
-        for label, ok in checks:
-            if not ok:
-                failures.append("assertion failed: %s" % label)
+        c.check("legacy: frame grown to .registers 5", ".registers 5" in apm)
+        c.check("legacy: override hook present", "KaoriFeatureOverrides;->getOverride" in apm)
+        # v0,v1 are the new scratch locals; v2=this, v3=String, v4=int.
+        c.check("legacy: override args are (mContext, p1, pkg)", "invoke-static {v1, v3, v0}" in apm)
+        c.check("legacy: catchall guard present", ".catchall {:try_start_kaorios" in apm)
+        c.check("legacy: Context hook present", "KaoriProps(Landroid/content/Context;)V" in inst)
+        c.check("legacy: first overload passes v2", "invoke-static {v2}, Lcom/android/internal/util/kaorios/KaoriPropsUtils;" in inst)
+        c.check("legacy: second overload passes v3", "invoke-static {v3}, Lcom/android/internal/util/kaorios/KaoriPropsUtils;" in inst)
+        c.check("legacy: keybox hook present", "KaoriGetKeyEntry" in ks2)
+        c.check("legacy: cert chain marker present", "KaoriGetCertificateChain()V" in spi)
+        c.check("legacy: cert chain swap present", "KaoriGetCertificateChain([Ljava/security/cert/Certificate;)" in spi)
+        c.check("legacy: cert chain swap reuses v3", "move-result-object v3" in spi)
 
-        # -- idempotency ---------------------------------------------------
-        res = run("patch", "--decompile-dir", root, "--sdk", "31")
-        if "already" not in res.stdout:
-            failures.append("second run was not detected as already patched:\n%s" % res.stdout)
-        print("--- second run ---")
+        res = run("patch", "--decompile-dir", root, "--profile", "legacy", "--sdk", "31")
+        c.check("legacy: idempotent", "already" in res.stdout)
+    finally:
+        shutil.rmtree(root, ignore_errors=True)
+
+
+def test_modern(c: Checker) -> None:
+    root = build_tree(MODERN_FIXTURES)
+    try:
+        res = run("patch", "--decompile-dir", root, "--profile", "modern", "--sdk", "33")
+        print("--- modern, first run ---")
         print(res.stdout.strip())
+        c.equals("modern patch exit code", res.returncode, 0)
 
-        # -- bucket selection ----------------------------------------------
-        # Extra classes must land in the highest smali bucket, otherwise a
-        # large framework.jar can blow the 64K method limit of classes.dex.
+        kpg = read(root, "smali/android/security/keystore2/AndroidKeyStoreKeyPairGeneratorSpi.smali")
+        inst = read(root, "smali/android/app/Instrumentation.smali")
+        spi = read(root, "smali/android/security/keystore2/AndroidKeyStoreSpi.smali")
+
+        c.check("modern: software keypair hook present", "initGenerateSoftwareKeyPair" in kpg)
+        # The frame must NOT grow: `this` would move from v15 to v16.
+        c.check("modern: frame left at .registers 16", ".registers 16" in kpg)
+        c.check("modern: scratch reused v14", "move-result-object v14" in kpg)
+        c.check("modern: this still v15", "invoke-static {v15}, Landroid/security/kaorios/KaoriosHook;->initGenerateSoftwareKeyPair" in kpg)
+        c.check("modern: reuse reported", "reused v14" in res.stdout)
+        c.check("modern: initContext present", "KaoriosHook;->initContext" in inst)
+        c.check("modern: cert chain hook present", "CertificateChainIfNeeded" in spi)
+        c.check("modern: no legacy class leaked", "KaoriKeyboxHooks" not in spi)
+
+        res = run("patch", "--decompile-dir", root, "--profile", "modern", "--sdk", "33")
+        c.check("modern: idempotent", "already" in res.stdout)
+    finally:
+        shutil.rmtree(root, ignore_errors=True)
+
+
+def test_services(c: Checker) -> None:
+    root = build_tree(SERVICES_FIXTURES)
+    try:
+        res = run("patch", "--decompile-dir", root, "--profile", "modern", "--artifact", "services")
+        print("--- services artifact ---")
+        print(res.stdout.strip())
+        c.equals("services patch exit code", res.returncode, 0)
+
+        srv = read(root, "smali/com/android/server/SystemServer.smali")
+        c.check("services: initSystemServer present", "initSystemServer()V" in srv)
+
+        body = srv.splitlines()
+        hook_at = next((i for i, l in enumerate(body) if "initSystemServer()V" in l), -1)
+        call_at = next((i for i, l in enumerate(body) if "startOtherServices" in l), -1)
+        c.check("services: hook inserted before the call site", 0 <= hook_at < call_at)
+    finally:
+        shutil.rmtree(root, ignore_errors=True)
+
+
+def test_bucket_selection(c: Checker) -> None:
+    root = build_tree(LEGACY_FIXTURES)
+    try:
+        # Extra classes must land in the highest smali bucket, otherwise a large
+        # framework.jar can blow the 64K method limit of classes.dex.
         os.makedirs(os.path.join(root, "smali_classes2"), exist_ok=True)
+        source = os.path.join(root, "_hooks")
         res = run("inject", "--decompile-dir", root, "--source", source)
         expected = os.path.join(
             root, "smali_classes2", "com", "android", "internal", "util", "kaorios",
             "KaoriPropsUtils.smali",
         )
-        if not os.path.isfile(expected):
-            failures.append("hook class was not placed in the highest smali bucket:\n%s" % res.stdout)
-        else:
-            print("--- bucket selection ---")
-            print("injected into smali_classes2")
+        print("--- bucket selection ---")
+        print("injected into smali_classes2" if os.path.isfile(expected) else res.stdout.strip())
+        c.check("bucket: injected into the highest smali bucket", os.path.isfile(expected))
     finally:
         shutil.rmtree(root, ignore_errors=True)
 
-    if failures:
-        print("\nFAILED (%d)" % len(failures))
-        for f in failures:
+
+def test_profile_listing(c: Checker) -> None:
+    res = run("list")
+    c.equals("list exit code", res.returncode, 0)
+    c.check("list mentions legacy", "legacy:" in res.stdout)
+    c.check("list mentions modern", "modern:" in res.stdout)
+    c.check("list mentions services artifact", "services" in res.stdout)
+
+
+def main() -> int:
+    c = Checker()
+    test_legacy(c)
+    test_modern(c)
+    test_services(c)
+    test_bucket_selection(c)
+    test_profile_listing(c)
+
+    if c.failures:
+        print("\nFAILED (%d)" % len(c.failures))
+        for f in c.failures:
             print("  - %s" % f)
         return 1
 
-    print("all engine checks passed")
+    print("\nall engine checks passed")
     return 0
 
 

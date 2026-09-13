@@ -1,16 +1,23 @@
 #!/usr/bin/env bash
 #
-# patcher.sh - patch a ROM's framework.jar with the Kaorios Toolbox hooks.
+# patcher.sh - patch a ROM's framework.jar (and optionally services.jar) with
+# the Kaorios Toolbox hooks.
 #
 # Quick start
-#   ./scripts/patcher.sh --sdk 31 framework.jar          # Android 12
+#   ./scripts/patcher.sh --sdk 31 framework.jar                      # Android 12
+#   ./scripts/patcher.sh --sdk 33 --services-jar services.jar framework.jar
 #   ./scripts/patcher.sh --sdk 31 --dry-run framework.jar
 #
-# Run from the Toolbox-patcher directory, or pass an absolute --jar path.
+# Run from the Toolbox-patcher directory, or pass absolute paths.
 #
-# The important behaviour change compared to the previous revision: the target
-# SDK level is now an input, not a hardcoded 35. Everything downstream
-# (D8 --min-api, and which hooks the engine expects to find) follows from it.
+# Two things differ from the previous revision. The target SDK level is an
+# input rather than a hardcoded 35, and the hook profile is chosen from it:
+#
+#   legacy  Android 12 era, hooks android.security.KeyStore2.getKeyEntry
+#   modern  Android 13+ era, hooks AndroidKeyStoreKeyPairGeneratorSpi
+#
+# The modern profile also needs com/android/server/SystemServer patched, which
+# lives in services.jar — pass it with --services-jar.
 
 set -uo pipefail
 
@@ -31,23 +38,27 @@ source "$SCRIPT_DIR/core/kaorios_patches.sh"
 
 usage() {
     cat <<'EOF'
-Patch a framework.jar with the Kaorios Toolbox hooks.
+Patch a framework.jar (and optionally services.jar) with the Kaorios hooks.
 
 Usage:
   patcher.sh [options] [framework.jar]
 
 Options:
-  -j, --jar PATH      framework.jar to patch (default: ./framework.jar)
-  -s, --sdk N         target Android SDK level, e.g. 31 for Android 12.
-                      If omitted the script tries build.prop and then a
-                      heuristic on the decompiled tree.
-  -r, --rom-dir PATH  ROM root, used to find system/build.prop
-      --dry-run       Report what would change without writing files
-      --keep-work     Keep the decompiled tree (framework_decompile/)
-      --no-d8         Skip the D8 DEX optimisation step
-      --no-module     Skip building the Magisk module zip
-      --json          Emit the patch report as JSON
-  -h, --help          Show this help
+  -j, --jar PATH          framework.jar to patch (default: ./framework.jar)
+      --services-jar PATH also patch services.jar (required by the modern
+                          profile, which hooks com.android.server.SystemServer)
+  -s, --sdk N             target Android SDK level, e.g. 31 for Android 12.
+                          If omitted the script tries build.prop and then a
+                          heuristic on the decompiled tree.
+  -p, --profile NAME      legacy | modern. Default: derived from the SDK level.
+  -r, --rom-dir PATH      ROM root, used to find system/build.prop
+      --dry-run           Report what would change without writing files
+      --keep-work         Keep the decompiled trees
+      --no-d8             Skip the D8 DEX optimisation step
+      --no-module         Skip building the Magisk module zip
+      --json              Emit the patch report as JSON
+      --list-hooks        Print the hooks each profile applies, then exit
+  -h, --help              Show this help
 
 Exit codes:
   0  every required hook was applied
@@ -57,7 +68,9 @@ EOF
 }
 
 JAR_PATH=""
+SERVICES_JAR=""
 SDK=""
+PROFILE=""
 ROM_DIR=""
 DRY_RUN=0
 KEEP_WORK=0
@@ -67,17 +80,20 @@ JSON=0
 
 while [ $# -gt 0 ]; do
     case "$1" in
-        -j|--jar)      JAR_PATH="${2:-}"; shift 2 ;;
-        -s|--sdk)      SDK="${2:-}"; shift 2 ;;
-        -r|--rom-dir)  ROM_DIR="${2:-}"; shift 2 ;;
-        --dry-run)     DRY_RUN=1; shift ;;
-        --keep-work)   KEEP_WORK=1; shift ;;
-        --no-d8)       RUN_D8=0; shift ;;
-        --no-module)   BUILD_MODULE=0; shift ;;
-        --json)        JSON=1; shift ;;
-        -h|--help)     usage; exit 0 ;;
-        -*)            err "Unknown option: $1"; usage; exit 2 ;;
-        *)             JAR_PATH="$1"; shift ;;
+        -j|--jar)         JAR_PATH="${2:-}"; shift 2 ;;
+        --services-jar)   SERVICES_JAR="${2:-}"; shift 2 ;;
+        -s|--sdk)         SDK="${2:-}"; shift 2 ;;
+        -p|--profile)     PROFILE="${2:-}"; shift 2 ;;
+        -r|--rom-dir)     ROM_DIR="${2:-}"; shift 2 ;;
+        --dry-run)        DRY_RUN=1; shift ;;
+        --keep-work)      KEEP_WORK=1; shift ;;
+        --no-d8)          RUN_D8=0; shift ;;
+        --no-module)      BUILD_MODULE=0; shift ;;
+        --json)           JSON=1; shift ;;
+        --list-hooks)     kaorios_engine list; exit 0 ;;
+        -h|--help)        usage; exit 0 ;;
+        -*)               err "Unknown option: $1"; usage; exit 2 ;;
+        *)                JAR_PATH="$1"; shift ;;
     esac
 done
 
@@ -90,54 +106,60 @@ if [ -n "$SDK" ] && ! printf '%s' "$SDK" | grep -Eq '^[0-9]+$'; then
     exit 2
 fi
 
+if [ -n "$PROFILE" ] && [ "$PROFILE" != "legacy" ] && [ "$PROFILE" != "modern" ]; then
+    err "--profile expects 'legacy' or 'modern', got '$PROFILE'"
+    exit 2
+fi
+
 if [ ! -f "$JAR_PATH" ]; then
     err "framework.jar not found: $JAR_PATH"
+    exit 1
+fi
+
+if [ -n "$SERVICES_JAR" ] && [ ! -f "$SERVICES_JAR" ]; then
+    err "services.jar not found: $SERVICES_JAR"
     exit 1
 fi
 
 ensure_tools || exit 1
 
 log "Kaorios Toolbox patcher"
-log "  jar      : $JAR_PATH"
-log "  tools    : $TOOLS_DIR"
-log "  work dir : $WORK_DIR"
+log "  framework : $JAR_PATH"
+[ -n "$SERVICES_JAR" ] && log "  services  : $SERVICES_JAR"
+log "  tools     : $TOOLS_DIR"
+log "  work dir  : $WORK_DIR"
 
 # --------------------------------------------------------------------------
-# 1. Decompile
+# Resolve the target SDK. This needs the decompiled tree for the heuristic, so
+# the framework jar is decompiled first.
 # --------------------------------------------------------------------------
-# Derive the paths instead of capturing them from the helper: apktool writes
-# progress lines to stdout, so `$(decompile_jar ...)` would return the log text
-# glued to the directory name.
-BASE_NAME="$(basename "$JAR_PATH" .jar)"
-DECOMPILE_DIR="$WORK_DIR/${BASE_NAME}_decompile"
-PATCHED_JAR="${BASE_NAME}_patched.jar"
+FRAMEWORK_BASE="$(basename "$JAR_PATH" .jar)"
+FRAMEWORK_DECOMPILE="$WORK_DIR/${FRAMEWORK_BASE}_decompile"
 
 decompile_jar "$JAR_PATH" || {
     err "Failed to decompile $JAR_PATH"
     exit 1
 }
-
-if [ ! -d "$DECOMPILE_DIR" ]; then
-    err "Decompile reported success but $DECOMPILE_DIR does not exist"
+if [ ! -d "$FRAMEWORK_DECOMPILE" ]; then
+    err "Decompile reported success but $FRAMEWORK_DECOMPILE does not exist"
     exit 1
 fi
 
-# --------------------------------------------------------------------------
-# 2. Resolve the target SDK
-# --------------------------------------------------------------------------
 if [ -z "$SDK" ]; then
-    SDK="$(kaorios_detect_sdk "$JAR_PATH" "$DECOMPILE_DIR" "$ROM_DIR" || true)"
+    SDK="$(kaorios_detect_sdk "$JAR_PATH" "$FRAMEWORK_DECOMPILE" "$ROM_DIR" || true)"
 fi
-
-PROFILE="$(kaorios_profile_for_sdk "$SDK")"
 
 if [ -z "$SDK" ]; then
     err "Could not determine the target SDK level."
-    err "Pass --sdk (31 for Android 12, 33 for Android 13, 34 for Android 14, 35 for Android 15)."
+    err "Pass --sdk (31 = Android 12, 33 = Android 13, 34 = Android 14, 35 = Android 15)."
     exit 1
 fi
 
-log "Target SDK : $SDK (Android $(kaorios_sdk_to_android "$SDK"))"
+if [ -z "$PROFILE" ]; then
+    PROFILE="$(kaorios_profile_for_sdk "$SDK")"
+fi
+
+log "Target SDK  : $SDK (Android $(kaorios_sdk_to_android "$SDK"))"
 log "Hook profile: $PROFILE"
 
 if [ "$PROFILE" = "unsupported" ]; then
@@ -145,84 +167,118 @@ if [ "$PROFILE" = "unsupported" ]; then
     exit 1
 fi
 
-if [ "$PROFILE" = "modern" ]; then
-    warn "SDK $SDK normally uses the android.security.kaorios.KaoriosHook design"
-    warn "from V2.0.3+. This branch ships the legacy hook classes, so the patch"
-    warn "will only work if you also swap in the matching hook payload."
-fi
-
-# --------------------------------------------------------------------------
-# 3. Apply hooks
-# --------------------------------------------------------------------------
-PATCH_RC=0
-apply_kaorios_toolbox_patches "$DECOMPILE_DIR" "$SDK" "$JSON" "$DRY_RUN" || PATCH_RC=$?
-
-if [ "$PATCH_RC" -ne 0 ]; then
-    err "Patching failed. The decompiled tree is at $DECOMPILE_DIR"
-    exit 1
-fi
-
-if [ "$DRY_RUN" -eq 1 ]; then
-    log "Dry run complete — nothing was written"
-    if [ "$KEEP_WORK" -eq 0 ]; then
-        rm -rf "$DECOMPILE_DIR"
-    fi
-    exit 0
-fi
-
-# --------------------------------------------------------------------------
-# 4. Recompile
-# --------------------------------------------------------------------------
-recompile_jar "$JAR_PATH" || {
-    err "Failed to recompile"
-    exit 1
-}
-
-if [ ! -f "$WORK_DIR/$PATCHED_JAR" ]; then
-    err "Recompile finished but $WORK_DIR/$PATCHED_JAR is missing"
-    exit 1
-fi
-
-# --------------------------------------------------------------------------
-# 5. D8 optimisation
-# --------------------------------------------------------------------------
 MIN_API="$(kaorios_min_api_for_sdk "$SDK")"
 
-if [ "$RUN_D8" -eq 1 ]; then
-    log "Optimising with D8 (--min-api $MIN_API)"
-    if ! d8_optimize_jar "$PATCHED_JAR" "$MIN_API"; then
-        warn "D8 optimisation failed or was skipped — the unoptimised jar is still usable"
+# --------------------------------------------------------------------------
+# Patch one jar end to end.
+# --------------------------------------------------------------------------
+PATCHED_JARS=()
+
+patch_one_jar() {
+    local jar_path="$1"
+    local artifact="$2"
+    local base decompile_dir patched_jar
+
+    base="$(basename "$jar_path" .jar)"
+    decompile_dir="$WORK_DIR/${base}_decompile"
+    patched_jar="${base}_patched.jar"
+
+    # The framework jar is already decompiled at this point.
+    if [ ! -d "$decompile_dir" ]; then
+        decompile_jar "$jar_path" || {
+            err "Failed to decompile $jar_path"
+            return 1
+        }
+        [ -d "$decompile_dir" ] || {
+            err "Decompile reported success but $decompile_dir does not exist"
+            return 1
+        }
     fi
-else
-    log "Skipping D8 optimisation (--no-d8)"
-fi
 
-# --------------------------------------------------------------------------
-# 6. Module
-# --------------------------------------------------------------------------
-if [ "$BUILD_MODULE" -eq 1 ]; then
-    # module.sh expects to run from the Toolbox-patcher root and reads
-    # framework_patched.jar from there.
-    (
-        cd "$PROJECT_DIR" || exit 1
-        if [ ! -f "$PATCHED_JAR" ]; then
-            cp "$WORK_DIR/$PATCHED_JAR" . || exit 1
+    apply_kaorios_toolbox_patches "$decompile_dir" "$SDK" "$JSON" "$DRY_RUN" "$PROFILE" "$artifact" || {
+        err "Patching failed. The decompiled tree is at $decompile_dir"
+        return 1
+    }
+
+    if [ "$DRY_RUN" -eq 1 ]; then
+        return 0
+    fi
+
+    recompile_jar "$jar_path" || {
+        err "Failed to recompile $jar_path"
+        return 1
+    }
+    if [ ! -f "$WORK_DIR/$patched_jar" ]; then
+        err "Recompile finished but $WORK_DIR/$patched_jar is missing"
+        return 1
+    fi
+
+    if [ "$RUN_D8" -eq 1 ]; then
+        log "Optimising $patched_jar with D8 (--min-api $MIN_API)"
+        if ! d8_optimize_jar "$patched_jar" "$MIN_API"; then
+            warn "D8 optimisation failed for $patched_jar — the unoptimised jar is still usable"
         fi
-        source "$SCRIPT_DIR/core/module.sh"
-        create_kaorios_module
-    ) || warn "Module build failed"
-else
-    log "Skipping module build (--no-module)"
+    else
+        log "Skipping D8 optimisation (--no-d8)"
+    fi
+
+    PATCHED_JARS+=("$patched_jar")
+    return 0
+}
+
+patch_one_jar "$JAR_PATH" "framework" || exit 1
+
+# Whether the selected profile touches services.jar is decided by the engine's
+# patch table, so this script does not duplicate that knowledge.
+if [ -n "$SERVICES_JAR" ]; then
+    if kaorios_engine hooks --profile "$PROFILE" --artifact services; then
+        patch_one_jar "$SERVICES_JAR" "services" || exit 1
+    else
+        log "Profile '$PROFILE' has no services.jar hooks — skipping $SERVICES_JAR"
+    fi
+elif kaorios_engine hooks --profile "$PROFILE" --artifact services; then
+    warn "The '$PROFILE' profile also hooks com.android.server.SystemServer, which"
+    warn "lives in services.jar. Pass --services-jar to patch it."
 fi
 
 # --------------------------------------------------------------------------
-# 7. Clean up
+# Module
+# --------------------------------------------------------------------------
+if [ "$DRY_RUN" -eq 1 ]; then
+    log "Dry run complete — nothing was written"
+else
+    if [ "$BUILD_MODULE" -eq 1 ]; then
+        # module.sh expects to run from the Toolbox-patcher root and reads
+        # framework_patched.jar from there.
+        (
+            cd "$PROJECT_DIR" || exit 1
+            if [ ! -f "${FRAMEWORK_BASE}_patched.jar" ]; then
+                cp "$WORK_DIR/${FRAMEWORK_BASE}_patched.jar" . || exit 1
+            fi
+            source "$SCRIPT_DIR/core/module.sh"
+            create_kaorios_module
+        ) || warn "Module build failed"
+    else
+        log "Skipping module build (--no-module)"
+    fi
+fi
+
+# --------------------------------------------------------------------------
+# Clean up
 # --------------------------------------------------------------------------
 if [ "$KEEP_WORK" -eq 0 ]; then
-    rm -rf "$DECOMPILE_DIR"
-    log "Removed $DECOMPILE_DIR (use --keep-work to keep it)"
+    for jar in "${PATCHED_JARS[@]:-}"; do
+        [ -n "$jar" ] || continue
+        rm -rf "$WORK_DIR/$(basename "$jar" _patched.jar)_decompile"
+    done
+    rm -rf "$FRAMEWORK_DECOMPILE"
+    log "Removed decompiled trees (use --keep-work to keep them)"
 else
-    log "Kept $DECOMPILE_DIR"
+    log "Kept decompiled trees under $WORK_DIR"
 fi
 
-log "Done. Patched jar: $WORK_DIR/$PATCHED_JAR"
+if [ "${#PATCHED_JARS[@]}" -gt 0 ]; then
+    log "Done. Patched: ${PATCHED_JARS[*]}"
+else
+    log "Done."
+fi

@@ -26,7 +26,9 @@ decompile_jar() {
 
     backup_original_jar "$jar_file"
 
-    java -jar "${TOOLS_DIR}/apktool.jar" d -q -f "$jar_file" -o "$output_dir" || {
+    java -jar "$(kaorios_native_path "${TOOLS_DIR}/apktool.jar")" d -q -f \
+        "$(kaorios_native_path "$jar_file")" \
+        -o "$(kaorios_native_path "$output_dir")" || {
         err "apktool failed to decompile $jar_file"
         return 1
     }
@@ -49,7 +51,9 @@ decompile_jar() {
         fi
     done
 
-    echo "$output_dir"
+    # The output directory is reported through the log, not stdout: callers
+    # derive the path themselves, and a stray echo would be captured by any
+    # `$(...)` around this function.
 }
 
 recompile_jar() {
@@ -65,13 +69,14 @@ recompile_jar() {
         return 1
     fi
 
-    java -jar "${TOOLS_DIR}/apktool.jar" b -q -f "$output_dir" -o "$patched_jar" || {
+    java -jar "$(kaorios_native_path "${TOOLS_DIR}/apktool.jar")" b -q -f \
+        "$(kaorios_native_path "$output_dir")" \
+        -o "$(kaorios_native_path "$patched_jar")" || {
         err "apktool build failed for $output_dir"
         return 1
     }
 
     log "Created patched JAR: $patched_jar"
-    echo "$patched_jar"
 }
 
 d8_optimize_jar() {
@@ -122,10 +127,15 @@ d8_optimize_jar() {
 
     # 2. Execute D8
     # --release: Removes debug information (lines, source files) to reduce size.
-    # --min-api: Ensures proper multidex partitioning.
+    # --min-api: Ensures proper multidex partitioning, and must match the ROM.
     echo "[INFO] Executing D8 merge and redivision..."
-    "$d8_cmd" "$work_dir/raw"/*.dex \
-        --output "$work_dir/out" \
+    local dex_files=()
+    local f
+    for f in "$work_dir"/raw/*.dex; do
+        dex_files+=("$(kaorios_native_path "$f")")
+    done
+    "$d8_cmd" "${dex_files[@]}" \
+        --output "$(kaorios_native_path "$work_dir/out")" \
         --min-api "$MIN_API" \
         --release
 

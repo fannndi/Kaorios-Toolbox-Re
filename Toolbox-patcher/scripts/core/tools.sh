@@ -11,6 +11,20 @@ init_env() {
     mkdir -p "$BACKUP_DIR"
 }
 
+kaorios_native_path() {
+    # Translate an MSYS/Git-Bash path (e.g. /c/Users/x) into the native form a
+    # Windows binary can open. Native tools (python, java, d8) cannot resolve
+    # /c/... and silently look for it relative to the current drive root, which
+    # shows up as errors like "C:\c\Users\x: No such file or directory".
+    # No-op on Linux/macOS, where cygpath does not exist.
+    local p="$1"
+    if command -v cygpath >/dev/null 2>&1; then
+        cygpath -w "$p" 2>/dev/null || printf '%s\n' "$p"
+    else
+        printf '%s\n' "$p"
+    fi
+}
+
 kaorios_python() {
     # Resolve a python interpreter for the patch engine.
     # Honours KAORIOS_PYTHON, then python3, then python.

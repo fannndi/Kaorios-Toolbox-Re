@@ -14,7 +14,19 @@
 
 : "${ENGINE_PATH:=${SCRIPT_DIR}/lib/smali_engine.py}"
 
+kaorios_engine() {
+    local py
+    py="$(kaorios_python)" || {
+        err "No python interpreter found (set KAORIOS_PYTHON)"
+        return 1
+    }
+    "$py" "$(kaorios_native_path "$ENGINE_PATH")" "$@"
+}
+
 inject_kaorios_utility_classes() {
+    # Only the legacy profile needs the hook classes injected: the modern
+    # profile calls android.security.kaorios.KaoriosHook, which ships with the
+    # V2.0.3+ release rather than with this repository.
     local decompile_dir="$1"
     local kaorios_source="${SCRIPT_DIR}/../kaorios_toolbox/utils/kaorios"
 
@@ -23,17 +35,11 @@ inject_kaorios_utility_classes() {
         return 1
     fi
 
-    local py
-    py="$(kaorios_python)" || {
-        err "No python interpreter found (set KAORIOS_PYTHON)"
-        return 1
-    }
-
     log "Injecting hook classes into framework.jar..."
 
-    if ! "$py" "$ENGINE_PATH" inject \
-        --decompile-dir "$decompile_dir" \
-        --source "$kaorios_source"; then
+    if ! kaorios_engine inject \
+        --decompile-dir "$(kaorios_native_path "$decompile_dir")" \
+        --source "$(kaorios_native_path "$kaorios_source")"; then
         err "Failed to inject hook classes"
         return 1
     fi
@@ -41,31 +47,26 @@ inject_kaorios_utility_classes() {
     return 0
 }
 
+# apply_kaorios_toolbox_patches <decompile_dir> <sdk> <json> <dry_run> <profile> <artifact>
 apply_kaorios_toolbox_patches() {
     local decompile_dir="$1"
     local sdk="${2:-}"
     local json="${3:-0}"
     local dry_run="${4:-0}"
+    local profile="${5:-legacy}"
+    local artifact="${6:-framework}"
 
     log "========================================="
-    log "Applying Kaorios Toolbox patches"
+    log "Applying Kaorios Toolbox patches ($profile / $artifact)"
     log "========================================="
 
-    local py
-    py="$(kaorios_python)" || {
-        err "No python interpreter found (set KAORIOS_PYTHON)"
-        return 1
-    }
-
-    # In dry-run mode the hook classes are not copied either, so nothing on
-    # disk is touched.
-    if [ "$dry_run" != "1" ]; then
+    if [ "$profile" = "legacy" ] && [ "$artifact" = "framework" ] && [ "$dry_run" != "1" ]; then
         inject_kaorios_utility_classes "$decompile_dir" || return 1
-    else
+    elif [ "$profile" = "legacy" ] && [ "$artifact" = "framework" ]; then
         log "Dry run: skipping hook class injection"
     fi
 
-    local args=(patch --decompile-dir "$decompile_dir")
+    local args=(patch --decompile-dir "$(kaorios_native_path "$decompile_dir")" --profile "$profile" --artifact "$artifact")
     if [ -n "$sdk" ]; then
         args+=(--sdk "$sdk")
     fi
@@ -76,10 +77,10 @@ apply_kaorios_toolbox_patches() {
         args+=(--dry-run)
     fi
 
-    if ! "$py" "$ENGINE_PATH" "${args[@]}"; then
+    if ! kaorios_engine "${args[@]}"; then
         err "One or more required hooks could not be applied"
         err "Check the per-patch status above — 'not-found' means the class or"
-        err "method does not exist in this framework.jar."
+        err "method does not exist in this jar."
         return 1
     fi
 
