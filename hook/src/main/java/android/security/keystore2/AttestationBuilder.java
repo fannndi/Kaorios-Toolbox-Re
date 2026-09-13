@@ -1,4 +1,4 @@
-package android.security.farewell;
+package android.security.keystore2;
 
 import android.os.Build;
 
@@ -79,7 +79,7 @@ final class AttestationBuilder {
             CertificateFactory factory = CertificateFactory.getInstance("X.509");
             return (X509Certificate) factory.generateCertificate(new java.io.ByteArrayInputStream(certificate));
         } catch (Throwable throwable) {
-            FarewellLog.e("attestation build", throwable);
+            HookLog.e("attestation build", throwable);
             return null;
         }
     }

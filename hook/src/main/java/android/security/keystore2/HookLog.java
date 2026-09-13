@@ -1,14 +1,14 @@
-package android.security.farewell;
+package android.security.keystore2;
 
 import android.util.Log;
 
-public final class FarewellLog {
+public final class HookLog {
 
-    public static final String TAG = "FarewellHook";
+    public static final String TAG = "KeyStoreHooks";
 
     private static final boolean VERBOSE = false;
 
-    private FarewellLog() {
+    private HookLog() {
     }
 
     public static void d(String message) {

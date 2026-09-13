@@ -1,4 +1,4 @@
-package android.security.farewell;
+package android.security.keystore2;
 
 import android.content.ContentResolver;
 import android.provider.Settings;
@@ -7,15 +7,15 @@ import java.security.MessageDigest;
 import java.util.HashSet;
 import java.util.Set;
 
-public final class FarewellProbe {
+public final class HookProbe {
 
     private static final ThreadLocal<Set<String>> REMOVE_STAGE = new ThreadLocal<>();
 
-    private FarewellProbe() {
+    private HookProbe() {
     }
 
     public static boolean isProbeName(String name) {
-        return name != null && name.startsWith(FarewellConfig.KEY_PROBE);
+        return name != null && name.startsWith(HookConfig.KEY_PROBE);
     }
 
     public static void noteRemove(String namespace, String name) {
@@ -37,25 +37,25 @@ public final class FarewellProbe {
         }
         Set<String> seen = REMOVE_STAGE.get();
         boolean removeSeen = seen != null && seen.contains(namespace + "/" + name);
-        return digest(nonce + "|" + namespace + "|" + (removeSeen ? "R" : "-") + "|" + FarewellState.VERSION);
+        return digest(nonce + "|" + namespace + "|" + (removeSeen ? "R" : "-") + "|" + HookState.VERSION);
     }
 
     public static String expectedAnswer(String nonce, String namespace) {
-        return digest(nonce + "|" + namespace + "|R|" + FarewellState.VERSION);
+        return digest(nonce + "|" + namespace + "|R|" + HookState.VERSION);
     }
 
     private static String readNonce(ContentResolver resolver) {
         if (resolver == null) {
             return null;
         }
-        FarewellState.beginInternal();
+        HookState.beginInternal();
         try {
-            return Settings.Secure.getString(resolver, FarewellConfig.KEY_PROBE_NONCE);
+            return Settings.Secure.getString(resolver, HookConfig.KEY_PROBE_NONCE);
         } catch (Throwable throwable) {
-            FarewellLog.e("probe nonce read", throwable);
+            HookLog.e("probe nonce read", throwable);
             return null;
         } finally {
-            FarewellState.endInternal();
+            HookState.endInternal();
         }
     }
 
@@ -70,7 +70,7 @@ public final class FarewellProbe {
             }
             return builder.toString();
         } catch (Throwable throwable) {
-            FarewellLog.e("probe digest", throwable);
+            HookLog.e("probe digest", throwable);
             return "";
         }
     }

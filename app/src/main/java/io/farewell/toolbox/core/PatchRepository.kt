@@ -141,10 +141,10 @@ class PatchRepository(private val context: Context) {
             context.assets.open("zip/META-INF/com/google/android/update-binary").use { it.readBytes() }
         entries["META-INF/com/google/android/updater-script"] =
             context.assets.open("zip/META-INF/com/google/android/updater-script").use { it.readBytes() }
-        entries["META-INF/com/farewell/mount.sh"] =
-            context.assets.open("zip/META-INF/com/farewell/mount.sh").use { it.readBytes() }
-        entries["system_root/system/framework/farewell.patch"] =
-            "Farewell-Toolbox ${device.profile.id} $stamp\n".toByteArray(Charsets.UTF_8)
+        entries["META-INF/com/ks/mount.sh"] =
+            context.assets.open("zip/META-INF/com/ks/mount.sh").use { it.readBytes() }
+        entries["system_root/system/framework/keystore.patch"] =
+            "ks2 ${device.profile.id} $stamp\n".toByteArray(Charsets.UTF_8)
         return entries
     }
 
@@ -199,8 +199,8 @@ class PatchRepository(private val context: Context) {
     companion object {
         private const val FRAMEWORK_CAT =
             "cat /system/framework/framework.jar 2>/dev/null || cat /system_root/system/framework/framework.jar"
-        private const val MARKER_CLASS = "Landroid/security/farewell/FarewellHook;"
-        private const val VERSION_PREFIX = "farewell-"
+        private const val MARKER_CLASS = "Landroid/security/keystore2/KeyStoreHooks;"
+        private const val VERSION_PREFIX = "ks2-"
         private const val VERSION_SCAN_LIMIT = 1 shl 20
     }
 }

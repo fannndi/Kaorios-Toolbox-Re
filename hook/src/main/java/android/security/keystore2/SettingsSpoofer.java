@@ -1,4 +1,4 @@
-package android.security.farewell;
+package android.security.keystore2;
 
 import android.content.ContentResolver;
 
@@ -24,16 +24,16 @@ public final class SettingsSpoofer {
 
     public static boolean shouldHideDevStatusFromNameValueCache(ContentResolver resolver, String name, int userId) {
         try {
-            if (name == null || !DEV_KEYS.contains(name) || FarewellState.isInternalCall()) {
+            if (name == null || !DEV_KEYS.contains(name) || HookState.isInternalCall()) {
                 return false;
             }
-            FarewellConfig config = FarewellState.config();
+            HookConfig config = HookState.config();
             if (!config.isHideDevStatus()) {
                 return false;
             }
-            return !isExemptPackage(FarewellState.currentPackage());
+            return !isExemptPackage(HookState.currentPackage());
         } catch (Throwable throwable) {
-            FarewellLog.e("hideDevStatus", throwable);
+            HookLog.e("hideDevStatus", throwable);
             return false;
         }
     }
@@ -43,16 +43,16 @@ public final class SettingsSpoofer {
             if (namespace == null || name == null) {
                 return false;
             }
-            FarewellProbe.noteRemove(namespace, name);
-            if (FarewellProbe.isProbeName(name) || FarewellState.isInternalCall()) {
+            HookProbe.noteRemove(namespace, name);
+            if (HookProbe.isProbeName(name) || HookState.isInternalCall()) {
                 return false;
             }
             if (!TABLES.contains(namespace)) {
                 return false;
             }
-            return FarewellState.config().shouldRemove(namespace, name);
+            return HookState.config().shouldRemove(namespace, name);
         } catch (Throwable throwable) {
-            FarewellLog.e("shouldRemoveSetting", throwable);
+            HookLog.e("shouldRemoveSetting", throwable);
             return false;
         }
     }
@@ -62,28 +62,28 @@ public final class SettingsSpoofer {
             if (namespace == null || name == null) {
                 return value;
             }
-            if (FarewellProbe.isProbeName(name)) {
-                return FarewellProbe.answer(resolver, namespace, name);
+            if (HookProbe.isProbeName(name)) {
+                return HookProbe.answer(resolver, namespace, name);
             }
-            if (FarewellState.isInternalCall() || !TABLES.contains(namespace)) {
+            if (HookState.isInternalCall() || !TABLES.contains(namespace)) {
                 return value;
             }
-            FarewellConfig config = FarewellState.config();
+            HookConfig config = HookState.config();
             if (config.shouldRemove(namespace, name)) {
                 return value;
             }
-            int uid = FarewellState.callingUid();
-            if (FarewellState.isPrivilegedUid(uid)) {
+            int uid = HookState.callingUid();
+            if (HookState.isPrivilegedUid(uid)) {
                 return value;
             }
-            String packageName = FarewellState.packageForUid(uid);
+            String packageName = HookState.packageForUid(uid);
             if (packageName == null || isExemptPackage(packageName)) {
                 return value;
             }
             String spoofed = config.settingValue(packageName, namespace, name);
             return spoofed != null ? spoofed : value;
         } catch (Throwable throwable) {
-            FarewellLog.e("filterSettingValue", throwable);
+            HookLog.e("filterSettingValue", throwable);
             return value;
         }
     }
@@ -93,58 +93,58 @@ public final class SettingsSpoofer {
             if (namespace == null || name == null) {
                 return value;
             }
-            if (FarewellProbe.isProbeName(name)) {
-                android.content.Context context = FarewellState.context();
+            if (HookProbe.isProbeName(name)) {
+                android.content.Context context = HookState.context();
                 ContentResolver resolver = context == null ? null : context.getContentResolver();
-                return FarewellProbe.answer(resolver, namespace, name);
+                return HookProbe.answer(resolver, namespace, name);
             }
-            if (FarewellState.isInternalCall() || !TABLES.contains(namespace)) {
+            if (HookState.isInternalCall() || !TABLES.contains(namespace)) {
                 return value;
             }
-            FarewellConfig config = FarewellState.config();
+            HookConfig config = HookState.config();
             if (config.shouldRemove(namespace, name)) {
                 return null;
             }
-            int uid = FarewellState.callingUid();
-            if (FarewellState.isPrivilegedUid(uid)) {
+            int uid = HookState.callingUid();
+            if (HookState.isPrivilegedUid(uid)) {
                 return value;
             }
-            String packageName = FarewellState.packageForUid(uid);
+            String packageName = HookState.packageForUid(uid);
             if (packageName == null || isExemptPackage(packageName)) {
                 return value;
             }
             String spoofed = config.settingValue(packageName, namespace, name);
             return spoofed != null ? spoofed : value;
         } catch (Throwable throwable) {
-            FarewellLog.e("filterSettingValueAuto", throwable);
+            HookLog.e("filterSettingValueAuto", throwable);
             return value;
         }
     }
 
     public static boolean hasSettingOverride(Object nameValueCache, String name, int userId) {
         try {
-            if (name == null || FarewellState.isInternalCall()) {
+            if (name == null || HookState.isInternalCall()) {
                 return false;
             }
             String namespace = namespaceOf(nameValueCache);
             if (namespace == null || !TABLES.contains(namespace)) {
                 return false;
             }
-            if (FarewellProbe.isProbeName(name)) {
-                FarewellProbe.noteRemove(namespace, name);
+            if (HookProbe.isProbeName(name)) {
+                HookProbe.noteRemove(namespace, name);
                 return true;
             }
-            FarewellConfig config = FarewellState.config();
+            HookConfig config = HookState.config();
             if (config.shouldRemove(namespace, name)) {
                 return true;
             }
-            String packageName = FarewellState.currentPackage();
+            String packageName = HookState.currentPackage();
             if (packageName == null || isExemptPackage(packageName)) {
                 return false;
             }
             return config.settingValue(packageName, namespace, name) != null;
         } catch (Throwable throwable) {
-            FarewellLog.e("hasSettingOverride", throwable);
+            HookLog.e("hasSettingOverride", throwable);
             return false;
         }
     }
@@ -158,18 +158,18 @@ public final class SettingsSpoofer {
             if (namespace == null || !TABLES.contains(namespace)) {
                 return null;
             }
-            if (FarewellProbe.isProbeName(name)) {
-                android.content.Context context = FarewellState.context();
+            if (HookProbe.isProbeName(name)) {
+                android.content.Context context = HookState.context();
                 ContentResolver resolver = context == null ? null : context.getContentResolver();
-                return FarewellProbe.answer(resolver, namespace, name);
+                return HookProbe.answer(resolver, namespace, name);
             }
-            FarewellConfig config = FarewellState.config();
+            HookConfig config = HookState.config();
             if (config.shouldRemove(namespace, name)) {
                 return null;
             }
-            return config.settingValue(FarewellState.currentPackage(), namespace, name);
+            return config.settingValue(HookState.currentPackage(), namespace, name);
         } catch (Throwable throwable) {
-            FarewellLog.e("settingOverrideValue", throwable);
+            HookLog.e("settingOverrideValue", throwable);
             return null;
         }
     }
@@ -189,7 +189,7 @@ public final class SettingsSpoofer {
                 }
             }
         } catch (Throwable throwable) {
-            FarewellLog.w("namespace lookup failed: " + throwable);
+            HookLog.w("namespace lookup failed: " + throwable);
         }
         return null;
     }
@@ -202,7 +202,7 @@ public final class SettingsSpoofer {
                 || packageName.equals("com.android.providers.settings")) {
             return true;
         }
-        String self = FarewellState.currentPackage();
+        String self = HookState.currentPackage();
         return self != null && self.equals(packageName);
     }
 }

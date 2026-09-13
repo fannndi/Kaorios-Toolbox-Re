@@ -1,4 +1,4 @@
-package android.security.farewell;
+package android.security.keystore2;
 
 public final class SystemFeatureSpoofer {
 
@@ -10,9 +10,9 @@ public final class SystemFeatureSpoofer {
             if (feature == null) {
                 return null;
             }
-            return FarewellState.config().featureState(feature);
+            return HookState.config().featureState(feature);
         } catch (Throwable throwable) {
-            FarewellLog.e("hasSystemFeature", throwable);
+            HookLog.e("hasSystemFeature", throwable);
             return null;
         }
     }

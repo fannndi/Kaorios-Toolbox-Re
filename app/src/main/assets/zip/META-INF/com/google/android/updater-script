@@ -1,12 +1,12 @@
 ui_print("======================================");
-ui_print("  Farewell Toolbox framework patch");
+ui_print("  Framework patch");
 ui_print("======================================");
 
 ui_print(" Wiping package cache...");
 run_program("/sbin/sh", "-c", "rm -rf /data/system/package_cache");
 
 ui_print(" Mounting partitions...");
-package_extract_file("META-INF/com/farewell/mount.sh", "/tmp/mount.sh");
+package_extract_file("META-INF/com/ks/mount.sh", "/tmp/mount.sh");
 set_perm(0, 0, 0777, "/tmp/mount.sh");
 run_program("/tmp/mount.sh", "");
 delete("/tmp/mount.sh");

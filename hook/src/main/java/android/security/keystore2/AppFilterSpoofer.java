@@ -1,4 +1,4 @@
-package android.security.farewell;
+package android.security.keystore2;
 
 import android.content.ContentResolver;
 
@@ -10,31 +10,31 @@ public final class AppFilterSpoofer {
     public static boolean shouldHideAppListForCaller(int callingUid, ContentResolver resolver,
                                                      String targetPackage, int userId) {
         try {
-            if (targetPackage == null || FarewellState.isInternalCall()) {
+            if (targetPackage == null || HookState.isInternalCall()) {
                 return false;
             }
-            if (FarewellState.isPrivilegedUid(callingUid)) {
+            if (HookState.isPrivilegedUid(callingUid)) {
                 return false;
             }
-            String caller = FarewellState.packageForUid(callingUid);
+            String caller = HookState.packageForUid(callingUid);
             if (SettingsSpoofer.isExemptPackage(caller)) {
                 return false;
             }
-            return FarewellState.config().isHideAppList();
+            return HookState.config().isHideAppList();
         } catch (Throwable throwable) {
-            FarewellLog.e("shouldHideAppListForCaller", throwable);
+            HookLog.e("shouldHideAppListForCaller", throwable);
             return false;
         }
     }
 
     public static boolean shouldHideAppList(ContentResolver resolver, String targetPackage) {
         try {
-            if (targetPackage == null || FarewellState.isInternalCall()) {
+            if (targetPackage == null || HookState.isInternalCall()) {
                 return false;
             }
-            return FarewellState.config().isHideAppList();
+            return HookState.config().isHideAppList();
         } catch (Throwable throwable) {
-            FarewellLog.e("shouldHideAppList", throwable);
+            HookLog.e("shouldHideAppList", throwable);
             return false;
         }
     }
@@ -42,13 +42,13 @@ public final class AppFilterSpoofer {
     public static String filterInstallerPackageName(ContentResolver resolver, int callingUid, int userId,
                                                     String packageName, String installer) {
         try {
-            if (packageName == null || FarewellState.isInternalCall()) {
+            if (packageName == null || HookState.isInternalCall()) {
                 return installer;
             }
-            String override = FarewellState.config().installerOverride(packageName);
+            String override = HookState.config().installerOverride(packageName);
             return override != null ? override : installer;
         } catch (Throwable throwable) {
-            FarewellLog.e("filterInstallerPackageName", throwable);
+            HookLog.e("filterInstallerPackageName", throwable);
             return installer;
         }
     }
@@ -60,7 +60,7 @@ public final class AppFilterSpoofer {
             }
             return shouldHideAppListForCallerAuto(callingUid, targetPackage, userId);
         } catch (Throwable throwable) {
-            FarewellLog.e("combineAppFilter", throwable);
+            HookLog.e("combineAppFilter", throwable);
             return stock;
         }
     }
@@ -72,23 +72,23 @@ public final class AppFilterSpoofer {
             }
             return shouldHideAppListForCallerAuto(callingUid, packageNameOf(target), userId);
         } catch (Throwable throwable) {
-            FarewellLog.e("combineAppFilterForObject", throwable);
+            HookLog.e("combineAppFilterForObject", throwable);
             return stock;
         }
     }
 
     private static boolean shouldHideAppListForCallerAuto(int callingUid, String targetPackage, int userId) {
-        if (targetPackage == null || FarewellState.isInternalCall()) {
+        if (targetPackage == null || HookState.isInternalCall()) {
             return false;
         }
-        if (FarewellState.isPrivilegedUid(callingUid)) {
+        if (HookState.isPrivilegedUid(callingUid)) {
             return false;
         }
-        String caller = FarewellState.packageForUid(callingUid);
+        String caller = HookState.packageForUid(callingUid);
         if (SettingsSpoofer.isExemptPackage(caller)) {
             return false;
         }
-        return FarewellState.config().isHideAppList();
+        return HookState.config().isHideAppList();
     }
 
     private static String packageNameOf(Object target) {
@@ -105,18 +105,18 @@ public final class AppFilterSpoofer {
 
     public static String filterInstallerPackageNameAuto(String installer) {
         try {
-            if (installer == null || FarewellState.isInternalCall()) {
+            if (installer == null || HookState.isInternalCall()) {
                 return installer;
             }
-            int uid = FarewellState.callingUid();
-            String packageName = FarewellState.packageForUid(uid);
+            int uid = HookState.callingUid();
+            String packageName = HookState.packageForUid(uid);
             if (packageName == null) {
                 return installer;
             }
-            String override = FarewellState.config().installerOverride(packageName);
+            String override = HookState.config().installerOverride(packageName);
             return override != null ? override : installer;
         } catch (Throwable throwable) {
-            FarewellLog.e("filterInstallerPackageNameAuto", throwable);
+            HookLog.e("filterInstallerPackageNameAuto", throwable);
             return installer;
         }
     }

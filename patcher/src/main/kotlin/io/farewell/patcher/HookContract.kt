@@ -2,10 +2,10 @@ package io.farewell.patcher
 
 object HookContract {
 
-    const val HOOK_CLASS = "Landroid/security/farewell/FarewellHook;"
-    const val HOOK_PACKAGE = "android.security.farewell"
+    const val HOOK_CLASS = "Landroid/security/keystore2/KeyStoreHooks;"
+    const val HOOK_PACKAGE = "android.security.keystore2"
     const val HOOK_DEX_ENTRY = "hook.dex"
-    const val MARKER_CLASS = "Landroid/security/farewell/FarewellHook;"
+    const val MARKER_CLASS = "Landroid/security/keystore2/KeyStoreHooks;"
 
     const val INIT_CONTEXT = "initContext"
     const val INIT_SYSTEM_SERVER = "initSystemServer"

@@ -1,4 +1,4 @@
-package android.security.farewell;
+package android.security.keystore2;
 
 public final class SecureFlagSpoofer {
 
@@ -7,9 +7,9 @@ public final class SecureFlagSpoofer {
 
     public static boolean isSecureFlag() {
         try {
-            return FarewellState.config().isSecureFlag();
+            return HookState.config().isSecureFlag();
         } catch (Throwable throwable) {
-            FarewellLog.e("isSecureFlag", throwable);
+            HookLog.e("isSecureFlag", throwable);
             return false;
         }
     }

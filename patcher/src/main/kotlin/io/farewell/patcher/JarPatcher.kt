@@ -54,7 +54,7 @@ object JarPatcher {
             }
 
             if (alreadyPatched) {
-                log("$kind already contains FarewellHook calls, keeping original dex files")
+                log("$kind already contains hook calls, keeping original dex files")
             }
 
             val maxIndex = dexNames.map { dexIndex(it) }.maxOrNull() ?: 0

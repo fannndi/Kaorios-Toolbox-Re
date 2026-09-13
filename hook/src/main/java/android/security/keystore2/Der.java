@@ -1,4 +1,4 @@
-package android.security.farewell;
+package android.security.keystore2;
 
 import java.io.ByteArrayOutputStream;
 import java.math.BigInteger;

@@ -1,4 +1,4 @@
-package android.security.farewell;
+package android.security.keystore2;
 
 import android.content.Context;
 import android.provider.Settings;
@@ -36,12 +36,12 @@ public final class KeyboxEngine {
     private KeyboxEngine() {
     }
 
-    public static KeyPair generateKeyPair(Object spi, FarewellConfig config) {
+    public static KeyPair generateKeyPair(Object spi, HookConfig config) {
         try {
             if (config == null || !config.isKeyboxSpoof()) {
                 return null;
             }
-            Context context = FarewellState.context();
+            Context context = HookState.context();
             if (context == null) {
                 return null;
             }
@@ -74,7 +74,7 @@ public final class KeyboxEngine {
                     material.subjectDer,
                     material.subjectDer,
                     challenge,
-                    FarewellState.currentPackage()
+                    HookState.currentPackage()
             );
             if (leaf == null) {
                 return null;
@@ -84,10 +84,10 @@ public final class KeyboxEngine {
             chain[0] = leaf;
             System.arraycopy(material.chain, 0, chain, 1, material.chain.length);
             sGenerated.put(alias, new Entry(pair, chain));
-            FarewellLog.d("software keypair generated for alias " + alias + " (" + chain.length + " certs)");
+            HookLog.d("software keypair generated for alias " + alias + " (" + chain.length + " certs)");
             return pair;
         } catch (Throwable throwable) {
-            FarewellLog.e("generateKeyPair", throwable);
+            HookLog.e("generateKeyPair", throwable);
             return null;
         }
     }
@@ -105,12 +105,12 @@ public final class KeyboxEngine {
         return chain != null && chain.length > 0 ? chain[0] : null;
     }
 
-    public static Certificate[] replaceChain(Certificate[] chain, FarewellConfig config) {
+    public static Certificate[] replaceChain(Certificate[] chain, HookConfig config) {
         try {
             if (config == null || !config.isKeyboxSpoof()) {
                 return chain;
             }
-            Context context = FarewellState.context();
+            Context context = HookState.context();
             if (context == null) {
                 return chain;
             }
@@ -129,20 +129,20 @@ public final class KeyboxEngine {
             sCachedChain = parsed;
             return parsed;
         } catch (Throwable throwable) {
-            FarewellLog.e("replaceChain", throwable);
+            HookLog.e("replaceChain", throwable);
             return chain;
         }
     }
 
     private static String readKeybox(Context context) {
-        FarewellState.beginInternal();
+        HookState.beginInternal();
         try {
-            return Settings.Global.getString(context.getContentResolver(), FarewellConfig.KEY_KEYBOX);
+            return Settings.Global.getString(context.getContentResolver(), HookConfig.KEY_KEYBOX);
         } catch (Throwable throwable) {
-            FarewellLog.e("keybox read", throwable);
+            HookLog.e("keybox read", throwable);
             return null;
         } finally {
-            FarewellState.endInternal();
+            HookState.endInternal();
         }
     }
 
@@ -166,7 +166,7 @@ public final class KeyboxEngine {
                 type = type.getSuperclass();
             }
         } catch (Throwable throwable) {
-            FarewellLog.e("findKeyGenSpec", throwable);
+            HookLog.e("findKeyGenSpec", throwable);
         }
         return null;
     }
@@ -200,7 +200,7 @@ public final class KeyboxEngine {
             byte[] keyDer = android.util.Base64.decode(keyMatcher.group(1), android.util.Base64.DEFAULT);
             PrivateKey privateKey = parsePrivateKey(keyDer);
             if (privateKey == null) {
-                FarewellLog.w("keybox private key could not be parsed");
+                HookLog.w("keybox private key could not be parsed");
                 return null;
             }
             Certificate[] chain = parseChain(xml);
@@ -215,7 +215,7 @@ public final class KeyboxEngine {
             sCachedXml = xml;
             return material;
         } catch (Throwable throwable) {
-            FarewellLog.e("keybox material", throwable);
+            HookLog.e("keybox material", throwable);
             return null;
         }
     }
@@ -244,7 +244,7 @@ public final class KeyboxEngine {
             }
             return certificates.toArray(new Certificate[0]);
         } catch (Throwable throwable) {
-            FarewellLog.e("keybox parse", throwable);
+            HookLog.e("keybox parse", throwable);
             return null;
         }
     }

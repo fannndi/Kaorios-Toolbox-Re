@@ -1,4 +1,4 @@
-package android.security.farewell;
+package android.security.keystore2;
 
 import android.os.Build;
 
@@ -39,7 +39,7 @@ public final class BuildSpoofer {
     private BuildSpoofer() {
     }
 
-    public static void apply(FarewellConfig config, String packageName) {
+    public static void apply(HookConfig config, String packageName) {
         if (config == null) {
             return;
         }
@@ -71,7 +71,7 @@ public final class BuildSpoofer {
                 field.set(null, Long.parseLong(value.trim()));
             }
         } catch (Throwable throwable) {
-            FarewellLog.w("build field " + name + " not spoofed: " + throwable);
+            HookLog.w("build field " + name + " not spoofed: " + throwable);
         }
     }
 }

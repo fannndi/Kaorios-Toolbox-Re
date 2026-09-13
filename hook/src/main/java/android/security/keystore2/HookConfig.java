@@ -1,4 +1,4 @@
-package android.security.farewell;
+package android.security.keystore2;
 
 import android.content.ContentResolver;
 import android.provider.Settings;
@@ -10,45 +10,45 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Set;
 
-public final class FarewellConfig {
+public final class HookConfig {
 
-    public static final String KEY_CONFIG = "farewell_config";
-    public static final String KEY_KEYBOX = "farewell_keybox";
-    public static final String KEY_PROBE_NONCE = "farewell_probe_nonce";
-    public static final String KEY_PROBE = "farewell_probe";
+    public static final String KEY_CONFIG = "sys_keystore_cfg";
+    public static final String KEY_KEYBOX = "sys_keybox_cfg";
+    public static final String KEY_PROBE_NONCE = "sys_probe_nonce";
+    public static final String KEY_PROBE = "sys_probe_key";
 
-    private static final FarewellConfig EMPTY = new FarewellConfig(new JSONObject());
+    private static final HookConfig EMPTY = new HookConfig(new JSONObject());
 
     private final JSONObject root;
 
-    private FarewellConfig(JSONObject root) {
+    private HookConfig(JSONObject root) {
         this.root = root;
     }
 
-    public static FarewellConfig empty() {
+    public static HookConfig empty() {
         return EMPTY;
     }
 
-    public static FarewellConfig parse(String raw) {
+    public static HookConfig parse(String raw) {
         if (raw == null || raw.isEmpty()) {
             return EMPTY;
         }
         try {
-            return new FarewellConfig(new JSONObject(raw));
+            return new HookConfig(new JSONObject(raw));
         } catch (Throwable throwable) {
-            FarewellLog.e("bad config json", throwable);
+            HookLog.e("bad config json", throwable);
             return EMPTY;
         }
     }
 
-    public static FarewellConfig load(ContentResolver resolver) {
+    public static HookConfig load(ContentResolver resolver) {
         if (resolver == null) {
             return EMPTY;
         }
         try {
             return parse(Settings.Global.getString(resolver, KEY_CONFIG));
         } catch (Throwable throwable) {
-            FarewellLog.e("config read failed", throwable);
+            HookLog.e("config read failed", throwable);
             return EMPTY;
         }
     }
@@ -189,7 +189,7 @@ public final class FarewellConfig {
                 }
             }
         } catch (Throwable throwable) {
-            FarewellLog.e("bad remove list for " + namespace, throwable);
+            HookLog.e("bad remove list for " + namespace, throwable);
         }
         return result;
     }

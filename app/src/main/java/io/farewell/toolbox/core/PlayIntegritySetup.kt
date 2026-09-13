@@ -24,6 +24,26 @@ object PlayIntegritySetup {
         "com.google.android.gms.ui"
     )
 
+    private val staticProps = linkedMapOf(
+        "ro.boot.verifiedbootstate" to "green",
+        "ro.boot.flash.locked" to "1",
+        "ro.boot.vbmeta.device_state" to "locked",
+        "ro.boot.veritymode" to "enforcing",
+        "ro.boot.warranty_bit" to "0",
+        "ro.warranty_bit" to "0",
+        "ro.debuggable" to "0",
+        "ro.secure" to "1",
+        "ro.build.type" to "user",
+        "ro.build.tags" to "release-keys",
+        "ro.build.selinux" to "1",
+        "sys.oem_unlock_allowed" to "0"
+    )
+
+    private val staticBuildFields = mapOf(
+        "TAGS" to "release-keys",
+        "TYPE" to "user"
+    )
+
     suspend fun apply(context: Context, flags: PlayIntegrityFlags): PlayIntegrityResult = withContext(Dispatchers.IO) {
         val dataDir = File(context.filesDir, "farewell-data")
         val pifFile = File(dataDir, "Pif-props.json")
@@ -37,12 +57,12 @@ object PlayIntegritySetup {
         val keybox = if (keyboxFile.exists()) keyboxFile.readText() else null
 
         val json = buildConfig(pif, flags, keybox != null)
-        val configWrite = writeSetting("farewell_config", json)
+        val configWrite = writeSetting("sys_keystore_cfg", json)
         if (configWrite.code != 0) {
             return@withContext PlayIntegrityResult(false, "Failed to write config: ${configWrite.output.trim()}")
         }
         if (keybox != null) {
-            val keyboxWrite = writeSetting("farewell_keybox", keybox)
+            val keyboxWrite = writeSetting("sys_keybox_cfg", keybox)
             if (keyboxWrite.code != 0) {
                 return@withContext PlayIntegrityResult(false, "Config saved, keybox failed: ${keyboxWrite.output.trim()}")
             }
@@ -78,7 +98,11 @@ object PlayIntegritySetup {
 
         val buildObject = JSONObject()
         for (pkg in pifPackages) {
-            buildObject.put(pkg, JSONObject(pif.toString()))
+            val entry = JSONObject(pif.toString())
+            for ((key, value) in staticBuildFields) {
+                entry.put(key, value)
+            }
+            buildObject.put(pkg, entry)
         }
         root.put("build", buildObject)
 
@@ -92,6 +116,9 @@ object PlayIntegritySetup {
             "ro.build.version.security_patch" to "SECURITY_PATCH"
         )
         val props = JSONObject()
+        for ((key, value) in staticProps) {
+            props.put(key, value)
+        }
         for ((prop, field) in propKeys) {
             val value = pif.optString(field, "")
             if (value.isNotEmpty()) {
@@ -110,5 +137,5 @@ object PlayIntegritySetup {
         return RootShell.run("settings put global $key '$escaped'", timeoutSeconds = 120)
     }
 
-    private const val KEYBOX_FILE = "farewell-keybox.xml"
+    private const val KEYBOX_FILE = "ks2-keybox.xml"
 }

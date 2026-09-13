@@ -20,11 +20,11 @@ object DexSupport {
         copy[4] = '0'.code.toByte()
         copy[5] = '3'.code.toByte()
         copy[6] = '9'.code.toByte()
-        FarewellLog("normalized dex version $version to 039")
+        log("normalized dex version $version to 039")
         return copy
     }
 
-    private fun FarewellLog(message: String) {
+    private fun log(message: String) {
         println("  [dex] $message")
     }
 }

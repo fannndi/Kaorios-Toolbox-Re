@@ -1,4 +1,4 @@
-package android.security.farewell;
+package android.security.keystore2;
 
 import android.content.ContentResolver;
 import android.content.Context;
@@ -6,17 +6,17 @@ import android.content.Context;
 import java.security.KeyPair;
 import java.security.cert.Certificate;
 
-public final class FarewellHook {
+public final class KeyStoreHooks {
 
-    private FarewellHook() {
+    private KeyStoreHooks() {
     }
 
     public static void initContext(Context context) {
-        FarewellState.initApp(context);
+        HookState.initApp(context);
     }
 
     public static void initSystemServer() {
-        FarewellState.initSystemServer();
+        HookState.initSystemServer();
     }
 
     public static Boolean hasSystemFeature(String name, int version) {
@@ -98,6 +98,6 @@ public final class FarewellHook {
     }
 
     public static String getFrameworkVersion() {
-        return FarewellState.VERSION;
+        return HookState.VERSION;
     }
 }

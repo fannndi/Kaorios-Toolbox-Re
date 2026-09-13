@@ -6,7 +6,7 @@ Android app that patches `framework.jar` / `services.jar` with the Farewell hook
 
 - `app/` — Farewell Toolbox APK (Jetpack Compose): patch status ON/OFF, build & export the flashable zip, stock backup zip, data sync.
 - `patcher/` — dexlib2 patch engine: signature-based rules for framework/services, 4-byte aligned jar writer, flashable zip builder, CLI.
-- `hook/` — `android.security.farewell.FarewellHook` library, compiled to `hook.dex` with D8 and injected into the patched jars.
+- `hook/` — `android.security.keystore2.KeyStoreHooks` library, compiled to `hook.dex` with D8 and injected into the patched jars.
 - `Toolbox-data/`, `Toolbox-languages/`, `Toolbox-docs/` — app data, translations, framework patch documentation.
 
 ## 📱 Supported ROM profiles
@@ -30,11 +30,11 @@ The app detects device codename, MIUI version and Android API, then picks the pr
 
 ### Play Integrity / Play Store certification
 
-- `Apply Play Integrity setup` in the app writes a single `farewell_config` JSON into `Settings.Global` (via root):
+- `Apply Play Integrity setup` in the app writes a single `sys_keystore_cfg` JSON into `Settings.Global` (via root):
   - `build`: PIF Build fields applied to `com.google.android.gms`, `com.android.vending`, `com.google.android.gsf` (from the synced `Pif-props.json`).
   - `props`: `SystemProperties.get` overrides (`ro.build.fingerprint`, `ro.product.*`, `ro.build.version.security_patch`).
   - `flags`: hidden developer status, hidden app list, FLAG_SECURE and keybox spoof.
-- Keybox XML can be imported from the device and is stored in `farewell_keybox`. `KeyboxEngine` now also implements the software keypair path: when an app requests hardware attestation (`KeyGenParameterSpec` with an attestation challenge), the hook generates a P-256 keypair and a fresh X.509 leaf certificate containing a KeyDescription attestation extension (verified boot state, locked bootloader, OS/patch levels, attestation application id) signed by the keybox private key, then returns `[newLeaf, keybox chain...]` for `engineGetCertificate` / `engineGetCertificateChain` through an alias cache.
+- Keybox XML can be imported from the device and is stored in `sys_keybox_cfg`. `KeyboxEngine` now also implements the software keypair path: when an app requests hardware attestation (`KeyGenParameterSpec` with an attestation challenge), the hook generates a P-256 keypair and a fresh X.509 leaf certificate containing a KeyDescription attestation extension (verified boot state, locked bootloader, OS/patch levels, attestation application id) signed by the keybox private key, then returns `[newLeaf, keybox chain...]` for `engineGetCertificate` / `engineGetCertificateChain` through an alias cache.
 - `Build` fields are also unfinalized and spoofed in `system_server` (`initSystemServer`) so GMS/Play Store checks in system processes see the same identity.
 
 ## 🛠️ Building

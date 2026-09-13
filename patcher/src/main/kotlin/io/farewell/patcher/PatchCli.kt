@@ -11,6 +11,7 @@ fun main(args: Array<String>) {
     var kind = JarKind.FRAMEWORK
     var scan = false
     var profile = PlatformProfiles.MODERN
+    var grep: Regex? = null
 
     var index = 0
     while (index < args.size) {
@@ -20,6 +21,7 @@ fun main(args: Array<String>) {
             "--hook" -> hook = File(args[index + 1]).also { index++ }
             "--kind" -> kind = JarKind.valueOf(args[index + 1].uppercase()).also { index++ }
             "--profile" -> profile = PlatformProfiles.byId(args[index + 1]).also { index++ }
+            "--grep" -> grep = Regex(args[index + 1], RegexOption.IGNORE_CASE).also { index++ }
             "--scan" -> scan = true
             else -> error("Unknown argument: ${args[index]}")
         }
@@ -27,6 +29,10 @@ fun main(args: Array<String>) {
     }
 
     val source = input ?: error("--input is required")
+    if (grep != null) {
+        grepClasses(source, grep)
+        return
+    }
     if (scan) {
         scanJar(source)
         return
@@ -53,8 +59,24 @@ fun main(args: Array<String>) {
             hookCallCount++
         }
     }
-    println("Verify: $dexCount dex files, $hookCallCount contain FarewellHook calls")
+    println("Verify: $dexCount dex files, $hookCallCount contain hook calls")
     check(dexCount > 0) { "Output jar has no dex files" }
+}
+
+private fun grepClasses(source: File, pattern: Regex) {
+    println("Grepping ${source.absolutePath} for /${pattern.pattern}/i")
+    val container = DexFileFactory.loadDexContainer(source, Opcodes.getDefault())
+    var matches = 0
+    for (entryName in container.dexEntryNames) {
+        val entry = container.getEntry(entryName) ?: continue
+        for (classDef in entry.dexFile.classes) {
+            if (pattern.containsMatchIn(classDef.type)) {
+                matches++
+                println("CLASS ${classDef.type}  [$entryName]")
+            }
+        }
+    }
+    println("Matches: $matches")
 }
 
 private fun scanJar(source: File) {

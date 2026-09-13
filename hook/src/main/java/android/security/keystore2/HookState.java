@@ -1,4 +1,4 @@
-package android.security.farewell;
+package android.security.keystore2;
 
 import android.content.Context;
 import android.os.Binder;
@@ -8,20 +8,20 @@ import java.lang.reflect.Method;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-public final class FarewellState {
+public final class HookState {
 
-    public static final String VERSION = "farewell-1.0.0";
+    public static final String VERSION = "ks2-1.0.0";
 
     private static final long CONFIG_TTL_MS = 2000L;
 
     private static volatile Context sContext;
     private static volatile boolean sSystemServer;
-    private static volatile FarewellConfig sConfig;
+    private static volatile HookConfig sConfig;
     private static volatile long sConfigTime;
     private static final ThreadLocal<Integer> INTERNAL = new ThreadLocal<>();
     private static final Map<Integer, String> UID_CACHE = new ConcurrentHashMap<>();
 
-    private FarewellState() {
+    private HookState() {
     }
 
     public static void initApp(Context context) {
@@ -30,10 +30,10 @@ public final class FarewellState {
                 return;
             }
             sContext = context.getApplicationContext() != null ? context.getApplicationContext() : context;
-            FarewellLog.d("init app " + context.getPackageName());
+            HookLog.d("init app " + context.getPackageName());
             BuildSpoofer.apply(config(), context.getPackageName());
         } catch (Throwable throwable) {
-            FarewellLog.e("initApp", throwable);
+            HookLog.e("initApp", throwable);
         }
     }
 
@@ -41,10 +41,10 @@ public final class FarewellState {
         try {
             sSystemServer = true;
             sContext = systemContext();
-            FarewellLog.d("init system_server context=" + sContext);
+            HookLog.d("init system_server context=" + sContext);
             BuildSpoofer.apply(config(), "android");
         } catch (Throwable throwable) {
-            FarewellLog.e("initSystemServer", throwable);
+            HookLog.e("initSystemServer", throwable);
         }
     }
 
@@ -79,19 +79,19 @@ public final class FarewellState {
         return sSystemServer;
     }
 
-    public static FarewellConfig config() {
-        FarewellConfig cached = sConfig;
+    public static HookConfig config() {
+        HookConfig cached = sConfig;
         long now = SystemClock.uptimeMillis();
         if (cached != null && now - sConfigTime < CONFIG_TTL_MS) {
             return cached;
         }
         Context context = sContext;
         if (context == null) {
-            return cached != null ? cached : FarewellConfig.empty();
+            return cached != null ? cached : HookConfig.empty();
         }
         beginInternal();
         try {
-            cached = FarewellConfig.load(context.getContentResolver());
+            cached = HookConfig.load(context.getContentResolver());
             sConfig = cached;
             sConfigTime = now;
         } finally {
@@ -149,7 +149,7 @@ public final class FarewellState {
                     resolved = packages[0];
                 }
             } catch (Throwable throwable) {
-                FarewellLog.e("packageForUid " + uid, throwable);
+                HookLog.e("packageForUid " + uid, throwable);
             } finally {
                 endInternal();
             }

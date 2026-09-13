@@ -1,4 +1,4 @@
-package android.security.farewell;
+package android.security.keystore2;
 
 public final class PropSpoofer {
 
@@ -7,13 +7,13 @@ public final class PropSpoofer {
 
     public static String filter(String key, String value) {
         try {
-            if (key == null || FarewellState.isInternalCall()) {
+            if (key == null || HookState.isInternalCall()) {
                 return value;
             }
-            String override = FarewellState.config().propOverride(FarewellState.currentPackage(), key);
+            String override = HookState.config().propOverride(HookState.currentPackage(), key);
             return override != null ? override : value;
         } catch (Throwable throwable) {
-            FarewellLog.e("filterSystemProperty", throwable);
+            HookLog.e("filterSystemProperty", throwable);
             return value;
         }
     }
