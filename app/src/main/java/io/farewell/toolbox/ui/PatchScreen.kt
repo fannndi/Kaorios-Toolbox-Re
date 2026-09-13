@@ -61,6 +61,21 @@ fun PatchScreen(state: PatchUiState, viewModel: MainViewModel, modifier: Modifie
                         "Root: ${if (state.root == true) "granted" else if (state.root == false) "unavailable" else "checking..."}",
                         style = MaterialTheme.typography.bodySmall
                     )
+                    Text(
+                        "Device: ${viewModel.device.model} (${viewModel.device.device}) - ${viewModel.device.miuiLabel} / Android ${viewModel.device.androidApi}",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Text(
+                        "Profile: ${viewModel.device.profile.id}",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    if (!viewModel.device.supportedDevice) {
+                        Text(
+                            "Unsupported device. Farewell patch is limited to surya (M2007J20CG / M2007J20CT).",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color(0xFFDC2626)
+                        )
+                    }
                 }
             }
         }
@@ -77,7 +92,7 @@ fun PatchScreen(state: PatchUiState, viewModel: MainViewModel, modifier: Modifie
                 }
                 Button(
                     onClick = { viewModel.buildPatch() },
-                    enabled = !state.busy && state.root == true
+                    enabled = !state.busy && state.root == true && viewModel.device.supportedDevice
                 ) {
                     Text("Build Patch ZIP")
                 }

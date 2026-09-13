@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import io.farewell.toolbox.BuildConfig
 import io.farewell.toolbox.core.DataSync
+import io.farewell.toolbox.core.DeviceProfileInfo
 import io.farewell.toolbox.core.PatchRepository
 import io.farewell.toolbox.core.RootShell
 import kotlinx.coroutines.Dispatchers
@@ -31,6 +32,8 @@ data class PatchUiState(
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository = PatchRepository(application)
+
+    val device: DeviceProfileInfo = repository.device
 
     private val _state = MutableStateFlow(
         PatchUiState(dataVersion = DataSync.cachedVersion(application))

@@ -53,6 +53,8 @@ fun HomeScreen(state: PatchUiState, viewModel: MainViewModel, modifier: Modifier
                 InfoRow("Model", "${Build.MANUFACTURER} ${Build.MODEL}")
                 InfoRow("Device", Build.DEVICE)
                 InfoRow("Android", "${Build.VERSION.RELEASE} (SDK ${Build.VERSION.SDK_INT})")
+                InfoRow("MIUI", viewModel.device.miuiLabel)
+                InfoRow("Profile", viewModel.device.profile.id)
                 InfoRow("Security patch", Build.VERSION.SECURITY_PATCH ?: "-")
                 InfoRow("Fingerprint", Build.FINGERPRINT)
                 InfoRow("App version", "${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})")

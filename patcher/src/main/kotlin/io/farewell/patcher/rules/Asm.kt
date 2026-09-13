@@ -56,6 +56,21 @@ object Asm {
         }
     }
 
+    fun invokeVirtual(registers: IntArray, reference: MethodReference): BuilderInstruction {
+        return if (canUse35c(registers)) {
+            val padded = IntArray(5)
+            registers.copyInto(padded)
+            BuilderInstruction35c(
+                Opcode.INVOKE_VIRTUAL,
+                registers.size,
+                padded[0], padded[1], padded[2], padded[3], padded[4],
+                reference
+            )
+        } else {
+            BuilderInstruction3rc(Opcode.INVOKE_VIRTUAL_RANGE, registers.first(), registers.size, reference)
+        }
+    }
+
     private fun canUse35c(registers: IntArray): Boolean {
         if (registers.size > 5) return false
         return registers.all { it in 0..15 }

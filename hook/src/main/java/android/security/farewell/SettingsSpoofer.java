@@ -121,6 +121,78 @@ public final class SettingsSpoofer {
         }
     }
 
+    public static boolean hasSettingOverride(Object nameValueCache, String name, int userId) {
+        try {
+            if (name == null || FarewellState.isInternalCall()) {
+                return false;
+            }
+            if (FarewellProbe.isProbeName(name)) {
+                return true;
+            }
+            String namespace = namespaceOf(nameValueCache);
+            if (namespace == null || !TABLES.contains(namespace)) {
+                return false;
+            }
+            FarewellConfig config = FarewellState.config();
+            if (config.shouldRemove(namespace, name)) {
+                return true;
+            }
+            String packageName = FarewellState.currentPackage();
+            if (packageName == null || isExemptPackage(packageName)) {
+                return false;
+            }
+            return config.settingValue(packageName, namespace, name) != null;
+        } catch (Throwable throwable) {
+            FarewellLog.e("hasSettingOverride", throwable);
+            return false;
+        }
+    }
+
+    public static String settingOverrideValue(Object nameValueCache, String name) {
+        try {
+            if (name == null) {
+                return null;
+            }
+            String namespace = namespaceOf(nameValueCache);
+            if (namespace == null || !TABLES.contains(namespace)) {
+                return null;
+            }
+            if (FarewellProbe.isProbeName(name)) {
+                android.content.Context context = FarewellState.context();
+                ContentResolver resolver = context == null ? null : context.getContentResolver();
+                return FarewellProbe.answer(resolver, namespace, name);
+            }
+            FarewellConfig config = FarewellState.config();
+            if (config.shouldRemove(namespace, name)) {
+                return null;
+            }
+            return config.settingValue(FarewellState.currentPackage(), namespace, name);
+        } catch (Throwable throwable) {
+            FarewellLog.e("settingOverrideValue", throwable);
+            return null;
+        }
+    }
+
+    private static String namespaceOf(Object nameValueCache) {
+        if (nameValueCache == null) {
+            return null;
+        }
+        try {
+            java.lang.reflect.Field field = nameValueCache.getClass().getDeclaredField("mUri");
+            field.setAccessible(true);
+            Object value = field.get(nameValueCache);
+            if (value instanceof android.net.Uri) {
+                java.util.List<String> segments = ((android.net.Uri) value).getPathSegments();
+                if (!segments.isEmpty()) {
+                    return segments.get(0);
+                }
+            }
+        } catch (Throwable throwable) {
+            FarewellLog.w("namespace lookup failed: " + throwable);
+        }
+        return null;
+    }
+
     static boolean isExemptPackage(String packageName) {
         if (packageName == null) {
             return true;

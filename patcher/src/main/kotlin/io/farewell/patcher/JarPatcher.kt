@@ -23,9 +23,10 @@ object JarPatcher {
         output: File,
         kind: JarKind,
         hookDex: ByteArray?,
+        profile: PlatformProfile = PlatformProfiles.MODERN,
         log: (String) -> Unit = {}
     ): PatchReport {
-        val engine = DexPatchEngine(kind)
+        val engine = DexPatchEngine(kind, profile)
         val patchedDex = LinkedHashMap<String, ByteArray>()
         var dexCount = 0
         var alreadyPatched = false

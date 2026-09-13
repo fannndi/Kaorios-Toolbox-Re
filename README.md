@@ -9,6 +9,17 @@ Android app that patches `framework.jar` / `services.jar` with the Farewell hook
 - `hook/` — `android.security.farewell.FarewellHook` library, compiled to `hook.dex` with D8 and injected into the patched jars.
 - `Toolbox-data/`, `Toolbox-languages/`, `Toolbox-docs/` — app data, translations, framework patch documentation.
 
+## 📱 Supported ROM profiles
+
+| Profile id | Device | ROM | Android |
+|---|---|---|---|
+| `surya-miui12` | POCO X3 (surya) | MIUI 12 | 10 (SDK 29) |
+| `surya-miui13` | POCO X3 (surya) | MIUI 13 | 12 (SDK 31) |
+| `surya-miui14` | POCO X3 (surya) | MIUI 14 | 12 (SDK 31) |
+| `modern-a13plus` | any | AOSP/MIUI 13+ | 13+ |
+
+The app detects device codename, MIUI version and Android API, then picks the profile automatically. Rules are gated by `apiRange`, so legacy (keystore v1, `AppsFilter`, `DevicePolicyCacheImpl.getScreenCaptureDisabled`) and modern (keystore2, `AppsFilterBase`, WMS capture) patch sets stay separate and maintainable.
+
 ## 🛠️ Building
 
 Requirements: JDK 17+ and Android SDK (platform 37, build-tools 36/37).

@@ -65,6 +65,14 @@ public final class FarewellHook {
         return SettingsSpoofer.filterSettingValueAuto(namespace, name, value);
     }
 
+    public static boolean hasSettingOverride(Object nameValueCache, String name, int userId) {
+        return SettingsSpoofer.hasSettingOverride(nameValueCache, name, userId);
+    }
+
+    public static String settingOverrideValue(Object nameValueCache, String name) {
+        return SettingsSpoofer.settingOverrideValue(nameValueCache, name);
+    }
+
     public static boolean isSecureFlag() {
         return SecureFlagSpoofer.isSecureFlag();
     }

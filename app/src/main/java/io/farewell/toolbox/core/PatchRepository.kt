@@ -5,7 +5,6 @@ import android.content.Context
 import android.os.Environment
 import android.provider.MediaStore
 import io.farewell.patcher.FlashZipBuilder
-import io.farewell.patcher.JarKind
 import io.farewell.patcher.JarPatcher
 import io.farewell.patcher.PatchReport
 import kotlinx.coroutines.Dispatchers
@@ -19,7 +18,8 @@ data class PatchStatus(
     val root: Boolean,
     val installed: Boolean,
     val installedVersion: String?,
-    val message: String
+    val message: String,
+    val profileId: String
 )
 
 data class BuildResult(
@@ -30,26 +30,28 @@ data class BuildResult(
 
 class PatchRepository(private val context: Context) {
 
+    val device: DeviceProfileInfo = DeviceDetector.detect()
+
     private val workDir: File
         get() = File(context.cacheDir, "farewell-work").apply { mkdirs() }
 
     suspend fun detectStatus(): PatchStatus = withContext(Dispatchers.IO) {
         if (!RootShell.isRootAvailable()) {
-            return@withContext PatchStatus(false, false, null, "Root access unavailable")
+            return@withContext PatchStatus(false, false, null, "Root access unavailable", device.profile.id)
         }
         val probe = File(workDir, "installed-framework.jar")
         probe.delete()
         val result = RootShell.copyToFile(FRAMEWORK_CAT, probe, timeoutSeconds = 300)
         if (result.code != 0 || !probe.exists() || probe.length() == 0L) {
-            return@withContext PatchStatus(true, false, null, "Could not read framework.jar: ${result.output}")
+            return@withContext PatchStatus(true, false, null, "Could not read framework.jar: ${result.output}", device.profile.id)
         }
         val containsHook = containsAscii(probe, MARKER_CLASS.toByteArray(Charsets.US_ASCII))
         val version = readVersion(probe)
         probe.delete()
         if (containsHook) {
-            PatchStatus(true, true, version, "Farewell patch installed")
+            PatchStatus(true, true, version, "Farewell patch installed", device.profile.id)
         } else {
-            PatchStatus(true, false, null, "Stock framework detected")
+            PatchStatus(true, false, null, "Stock framework detected", device.profile.id)
         }
     }
 
@@ -62,59 +64,49 @@ class PatchRepository(private val context: Context) {
 
         step("Checking root access")
         check(RootShell.isRootAvailable()) { "Root access unavailable" }
-
-        val stockFramework = File(workDir, "framework-stock.jar")
-        stockFramework.delete()
-        step("Pulling /system/framework/framework.jar")
-        val frameworkPull = RootShell.copyToFile(FRAMEWORK_CAT, stockFramework, timeoutSeconds = 600)
-        check(frameworkPull.code == 0 && stockFramework.length() > 0) {
-            "Failed to pull framework.jar: ${frameworkPull.output}"
+        check(device.supportedDevice) {
+            "Unsupported device: ${device.device} / ${device.model}. Farewell patch targets surya only."
         }
-
-        val stockServices = File(workDir, "services-stock.jar")
-        stockServices.delete()
-        step("Pulling /system/framework/services.jar")
-        val servicesPull = RootShell.copyToFile(SERVICES_CAT, stockServices, timeoutSeconds = 600)
-        val hasServices = servicesPull.code == 0 && stockServices.length() > 0
+        step("Device: ${device.model} (${device.device}), ${device.miuiLabel}, Android ${device.androidApi}")
+        step("Profile: ${device.profile.id} (${device.profile.label})")
 
         val hookDex = context.assets.open("hook.dex").use { it.readBytes() }
         step("Hook dex: ${hookDex.size} bytes")
 
-        val patchedFramework = File(workDir, "framework-patched.jar")
-        step("Patching framework.jar")
-        val frameworkReport = JarPatcher.patch(stockFramework, patchedFramework, JarKind.FRAMEWORK, hookDex) {
-            report.append("  [fw] ").append(it).append('\n')
-        }
-        appendReport(::step, frameworkReport)
+        val patchedFiles = LinkedHashMap<String, File>()
+        val stockFiles = LinkedHashMap<String, File>()
 
-        var patchedServices: File? = null
-        var servicesReport: PatchReport? = null
-        if (hasServices) {
-            patchedServices = File(workDir, "services-patched.jar")
-            step("Patching services.jar")
-            servicesReport = JarPatcher.patch(stockServices, patchedServices, JarKind.SERVICES, hookDex) {
-                report.append("  [svc] ").append(it).append('\n')
+        for (target in device.profile.targets) {
+            val name = target.systemPath.substringAfterLast('/')
+            val stockFile = File(workDir, "${target.kind.name.lowercase()}-stock-$name")
+            stockFile.delete()
+            step("Pulling /${target.systemPath}")
+            val pull = RootShell.copyToFile(catCommand(target.systemPath), stockFile, timeoutSeconds = 600)
+            if (pull.code != 0 || stockFile.length() == 0L) {
+                if (target.required) {
+                    error("Failed to pull /${target.systemPath}: ${pull.output}")
+                }
+                step("  not present, skipped")
+                continue
             }
-            appendReport(::step, servicesReport)
-        } else {
-            step("services.jar not found, skipping service hooks")
+            stockFiles[target.zipPath] = stockFile
+
+            val patchedFile = File(workDir, "${target.kind.name.lowercase()}-patched-$name")
+            step("Patching ${target.kind} (${stockFile.length() / 1024} KB)")
+            val targetReport = JarPatcher.patch(stockFile, patchedFile, target.kind, hookDex, device.profile) {
+                report.append("  [${target.kind}] ").append(it).append('\n')
+            }
+            appendReport(::step, targetReport)
+            patchedFiles[target.zipPath] = patchedFile
         }
 
         val stamp = SimpleDateFormat("yyyyMMdd-HHmm", Locale.US).format(Date())
-        val patchZip = File(workDir, "Farewell-Patch-$stamp.zip")
+        val patchZip = File(workDir, "Farewell-Patch-${device.profile.id}-$stamp.zip")
         step("Building flashable zip")
-        FlashZipBuilder.build(
-            patchZip,
-            templateEntries(stamp),
-            FlashZipBuilder.entriesForFramework(patchedFramework, patchedServices)
-        )
+        FlashZipBuilder.build(patchZip, templateEntries(stamp), patchedFiles)
 
-        val backupZip = File(workDir, "Farewell-Stock-$stamp.zip")
-        FlashZipBuilder.build(
-            backupZip,
-            templateEntries(stamp),
-            FlashZipBuilder.entriesForFramework(stockFramework, stockServices.takeIf { hasServices })
-        )
+        val backupZip = File(workDir, "Farewell-Stock-${device.profile.id}-$stamp.zip")
+        FlashZipBuilder.build(backupZip, templateEntries(stamp), stockFiles)
 
         step("Done")
         BuildResult(patchZip, backupZip, report.toString())
@@ -152,9 +144,12 @@ class PatchRepository(private val context: Context) {
         entries["META-INF/com/farewell/mount.sh"] =
             context.assets.open("zip/META-INF/com/farewell/mount.sh").use { it.readBytes() }
         entries["system_root/system/framework/farewell.patch"] =
-            "Farewell-Toolbox $stamp\n".toByteArray(Charsets.UTF_8)
+            "Farewell-Toolbox ${device.profile.id} $stamp\n".toByteArray(Charsets.UTF_8)
         return entries
     }
+
+    private fun catCommand(systemPath: String): String =
+        "cat /$systemPath 2>/dev/null || cat /system_root/$systemPath"
 
     private fun readVersion(file: File): String? {
         val bytes = ByteArray(VERSION_SCAN_LIMIT)
@@ -202,8 +197,8 @@ class PatchRepository(private val context: Context) {
     }
 
     companion object {
-        private const val FRAMEWORK_CAT = "cat /system/framework/framework.jar 2>/dev/null || cat /system_root/system/framework/framework.jar"
-        private const val SERVICES_CAT = "cat /system/framework/services.jar 2>/dev/null || cat /system_root/system/framework/services.jar"
+        private const val FRAMEWORK_CAT =
+            "cat /system/framework/framework.jar 2>/dev/null || cat /system_root/system/framework/framework.jar"
         private const val MARKER_CLASS = "Landroid/security/farewell/FarewellHook;"
         private const val VERSION_PREFIX = "farewell-"
         private const val VERSION_SCAN_LIMIT = 1 shl 20

@@ -21,6 +21,10 @@ import io.farewell.patcher.rules.StrictJarVerifierRule
 import io.farewell.patcher.rules.SystemServerInitRule
 import io.farewell.patcher.rules.WindowManagerCaptureRule
 import io.farewell.patcher.rules.WindowSecureRule
+import io.farewell.patcher.rules.LegacyAppsFilterRule
+import io.farewell.patcher.rules.LegacyScreenCaptureRule
+import io.farewell.patcher.rules.LegacyWindowManagerSecureRule
+import io.farewell.patcher.rules.SettingsNameValueCacheRule
 import io.farewell.patcher.rules.methodReference
 import io.farewell.patcher.rules.withImplementation
 import com.android.tools.smali.dexlib2.Opcodes
@@ -32,7 +36,10 @@ import com.android.tools.smali.dexlib2.writer.io.FileDataStore
 import com.android.tools.smali.dexlib2.writer.pool.DexPool
 import java.io.File
 
-class DexPatchEngine(private val kind: JarKind) {
+class DexPatchEngine(
+    private val kind: JarKind,
+    private val profile: PlatformProfile = PlatformProfiles.MODERN
+) {
 
     private data class RuleStat(var count: Int = 0, val samples: MutableList<String> = mutableListOf())
 
@@ -41,26 +48,32 @@ class DexPatchEngine(private val kind: JarKind) {
 
     private val classRules: List<ClassRule> = listOf(
         BuildFieldClassRule()
-    ).filter { it.enabledFor(kind) }
+    ).filter { it.enabledFor(kind) && profile.androidApi in it.apiRange }
 
     private val methodRules: List<MethodRule> = listOf(
         InstrumentationInitRule(),
         HasSystemFeatureRule(),
         GenerateSoftwareKeyPairRule(),
+        GenerateSoftwareKeyPairRule("Landroid/security/keystore/AndroidKeyStoreKeyPairGeneratorSpi;", 0..30),
         CertificateChainRule(),
+        CertificateChainRule("Landroid/security/keystore/AndroidKeyStoreSpi;", 0..30),
         HideDevStatusRule(),
+        SettingsNameValueCacheRule(),
         SystemServerInitRule(),
         AppsFilterRule(),
+        LegacyAppsFilterRule(),
         InstallerSourceRule(),
         SettingsProviderRule(),
         DevicePolicySecureRule(),
+        LegacyScreenCaptureRule(),
         WindowSecureRule(),
         WindowManagerCaptureRule(),
+        LegacyWindowManagerSecureRule(),
         SigningDetailsRule(),
         MessageDigestForceRule(),
         MinimumSignatureSchemeRule(),
         StrictJarVerifierRule()
-    ).filter { it.enabledFor(kind) }
+    ).filter { it.enabledFor(kind) && profile.androidApi in it.apiRange }
 
     fun outcomes(): List<RuleOutcome> {
         val result = mutableListOf<RuleOutcome>()

@@ -73,12 +73,15 @@ class HasSystemFeatureRule : MethodRule {
     }
 }
 
-class GenerateSoftwareKeyPairRule : MethodRule {
+class GenerateSoftwareKeyPairRule(
+    private val targetClass: String = "Landroid/security/keystore2/AndroidKeyStoreKeyPairGeneratorSpi;",
+    override val apiRange: IntRange = 31..Int.MAX_VALUE
+) : MethodRule {
     override val name = "framework.keystore.generateKeyPair"
     override fun enabledFor(kind: JarKind) = kind == JarKind.FRAMEWORK
 
     override fun applyMethod(classDef: ClassDef, method: Method, impl: MutableMethodImplementation): Boolean {
-        if (classDef.type != "Landroid/security/keystore2/AndroidKeyStoreKeyPairGeneratorSpi;") return false
+        if (classDef.type != targetClass) return false
         if (method.name != "generateKeyPair" || method.returnType != HookContract.KEY_PAIR) return false
         if (!method.isStaticMethod() && method.parameterTypesList().isNotEmpty()) return false
         if (method.isStaticMethod()) return false
@@ -106,12 +109,15 @@ class GenerateSoftwareKeyPairRule : MethodRule {
     }
 }
 
-class CertificateChainRule : MethodRule {
+class CertificateChainRule(
+    private val targetClass: String = "Landroid/security/keystore2/AndroidKeyStoreSpi;",
+    override val apiRange: IntRange = 31..Int.MAX_VALUE
+) : MethodRule {
     override val name = "framework.keystore.certificateChain"
     override fun enabledFor(kind: JarKind) = kind == JarKind.FRAMEWORK
 
     override fun applyMethod(classDef: ClassDef, method: Method, impl: MutableMethodImplementation): Boolean {
-        if (classDef.type != "Landroid/security/keystore2/AndroidKeyStoreSpi;") return false
+        if (classDef.type != targetClass) return false
         if (method.name != "engineGetCertificateChain" || method.returnType != HookContract.CERTIFICATE_ARRAY) return false
         val reference = Asm.methodRef(
             HOOK_CLASS, HookContract.CERTIFICATE_CHAIN_IF_NEEDED,

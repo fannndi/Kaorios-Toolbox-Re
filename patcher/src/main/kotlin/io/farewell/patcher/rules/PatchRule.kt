@@ -15,6 +15,7 @@ import com.android.tools.smali.dexlib2.iface.reference.MethodReference
 
 interface PatchRule {
     val name: String
+    val apiRange: IntRange get() = 0..Int.MAX_VALUE
     fun enabledFor(kind: JarKind): Boolean
 }
 
