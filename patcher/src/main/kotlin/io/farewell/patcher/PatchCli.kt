@@ -108,7 +108,9 @@ private fun scanJar(source: File) {
                 println("  final fields: ${finalFields.joinToString(", ")}")
             }
             for (method in classDef.methods) {
-                println("  ${method.name}(${method.parameterTypes.joinToString("")})${method.returnType}")
+                val registers = method.implementation?.registerCount ?: -1
+                val instructions = method.implementation?.instructions?.count() ?: 0
+                println("  ${method.name}(${method.parameterTypes.joinToString("")})${method.returnType}  [regs=$registers, insns=$instructions]")
             }
         }
     }

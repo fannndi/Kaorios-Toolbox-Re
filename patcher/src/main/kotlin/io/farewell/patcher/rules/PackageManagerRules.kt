@@ -36,9 +36,14 @@ class FilterAppAccessRule : MethodRule {
     override val apiRange: IntRange = 29..32
     override fun enabledFor(kind: JarKind) = kind == JarKind.SERVICES
 
-    private val hookRef = Asm.methodRef(
-        HOOK_CLASS, HookContract.SHOULD_HIDE_APP_LIST_FOR_CALLER,
-        listOf("I", HookContract.CONTENT_RESOLVER, HookContract.STRING, "I"), "Z"
+    private val stringHook = Asm.methodRef(
+        HOOK_CLASS, "combineAppFilter",
+        listOf("I", HookContract.STRING, "I", "Z"), "Z"
+    )
+
+    private val objectHook = Asm.methodRef(
+        HOOK_CLASS, "combineAppFilterForObject",
+        listOf("I", "Ljava/lang/Object;", "I", "Z"), "Z"
     )
 
     override fun applyMethod(classDef: ClassDef, method: Method, impl: MutableMethodImplementation): Boolean {
@@ -47,47 +52,19 @@ class FilterAppAccessRule : MethodRule {
         if (method.returnType != "Z") return false
         val params = method.parameterTypesList()
         if (params.size != 3 || params[1] != "I" || params[2] != "I") return false
-        if (method.localRegister(1) < 0) return false
 
         val callingUid = method.parameterRegister(1)
         val userId = method.parameterRegister(2)
-        if (callingUid < 0 || userId < 0) return false
+        val targetRegister = method.parameterRegister(0)
+        if (callingUid < 0 || userId < 0 || targetRegister < 0) return false
 
-        val label = impl.newLabelForIndex(0)
-        val instructions = mutableListOf<BuilderInstruction>()
-
-        if (params[0] == HookContract.STRING) {
-            val packageParam = method.parameterRegister(0)
-            if (packageParam < 0) return false
-            val scratch = method.localRegister(0)
-            instructions += Asm.constZero(scratch)
-            instructions += Asm.invokeStatic(intArrayOf(callingUid, scratch, packageParam, userId), hookRef)
-            instructions += Asm.moveResult(scratch)
-            instructions += Asm.ifEqz(scratch, label)
-            instructions += Asm.constOne(scratch)
-            instructions += Asm.returnInt(scratch)
-        } else {
-            val packageParam = method.parameterRegister(0)
-            if (packageParam < 0) return false
-            val packageRegister = method.localRegister(0)
-            val scratch = method.localRegister(1)
-            val getPackageName = Asm.methodRef(params[0], "getPackageName", emptyList(), HookContract.STRING)
-            val invoke = if (params[0].contains("AndroidPackage")) {
-                Asm.invokeInterface(intArrayOf(packageParam), getPackageName)
-            } else {
-                Asm.invokeVirtual(intArrayOf(packageParam), getPackageName)
-            }
-            instructions += invoke
-            instructions += Asm.moveResultObject(packageRegister)
-            instructions += Asm.constZero(scratch)
-            instructions += Asm.invokeStatic(intArrayOf(callingUid, scratch, packageRegister, userId), hookRef)
-            instructions += Asm.moveResult(scratch)
-            instructions += Asm.ifEqz(scratch, label)
-            instructions += Asm.constOne(scratch)
-            instructions += Asm.returnInt(scratch)
+        val stringVariant = params[0] == HookContract.STRING
+        return impl.replaceReturnsInt { resultRegister ->
+            val reference = if (stringVariant) stringHook else objectHook
+            listOf<BuilderInstruction>(
+                Asm.invokeStatic(intArrayOf(callingUid, targetRegister, userId, resultRegister), reference),
+                Asm.moveResult(resultRegister)
+            )
         }
-
-        impl.addAll(0, instructions)
-        return true
     }
 }

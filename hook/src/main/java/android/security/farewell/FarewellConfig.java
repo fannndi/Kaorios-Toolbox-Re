@@ -93,6 +93,29 @@ public final class FarewellConfig {
         return value.isEmpty() ? null : value;
     }
 
+    public String propOverride(String packageName, String key) {
+        JSONObject props = root.optJSONObject("props");
+        if (props == null || key == null) {
+            return null;
+        }
+        String value = null;
+        JSONObject global = props.optJSONObject("*");
+        if (global != null && global.has(key)) {
+            value = global.optString(key, null);
+        }
+        if (packageName != null) {
+            JSONObject perApp = props.optJSONObject(packageName);
+            if (perApp != null && perApp.has(key)) {
+                value = perApp.optString(key, null);
+            }
+        }
+        return value;
+    }
+
+    public boolean isKeyboxSpoof() {
+        return flag("keybox_spoof");
+    }
+
     public JSONObject buildOverride(String packageName) {
         JSONObject build = root.optJSONObject("build");
         if (build == null) {

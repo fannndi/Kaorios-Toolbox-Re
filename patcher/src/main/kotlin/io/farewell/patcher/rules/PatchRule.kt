@@ -90,6 +90,20 @@ fun MutableMethodImplementation.replaceReturnsObject(
     }
 }
 
+fun MutableMethodImplementation.replaceReturnsInt(
+    transform: (register: Int) -> List<BuilderInstruction>
+): Boolean {
+    val targets = instructions
+        .withIndex()
+        .filter { it.value.opcode == Opcode.RETURN }
+        .map { it.index to (it.value as OneRegisterInstruction).registerA }
+        .sortedByDescending { it.first }
+    for ((index, register) in targets) {
+        addAll(index, transform(register))
+    }
+    return targets.isNotEmpty()
+}
+
 fun Instruction.methodReference(): MethodReference? {
     val reference = (this as? ReferenceInstruction)?.reference
     return reference as? MethodReference

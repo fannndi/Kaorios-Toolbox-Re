@@ -73,6 +73,18 @@ public final class FarewellHook {
         return SettingsSpoofer.settingOverrideValue(nameValueCache, name);
     }
 
+    public static boolean combineAppFilter(int callingUid, String targetPackage, int userId, boolean stock) {
+        return AppFilterSpoofer.combineAppFilter(callingUid, targetPackage, userId, stock);
+    }
+
+    public static boolean combineAppFilterForObject(int callingUid, Object target, int userId, boolean stock) {
+        return AppFilterSpoofer.combineAppFilterForObject(callingUid, target, userId, stock);
+    }
+
+    public static String filterSystemProperty(String key, String value) {
+        return PropSpoofer.filter(key, value);
+    }
+
     public static boolean isSecureFlag() {
         return SecureFlagSpoofer.isSecureFlag();
     }

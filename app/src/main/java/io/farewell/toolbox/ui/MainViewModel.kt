@@ -7,6 +7,8 @@ import io.farewell.toolbox.BuildConfig
 import io.farewell.toolbox.core.DataSync
 import io.farewell.toolbox.core.DeviceProfileInfo
 import io.farewell.toolbox.core.PatchRepository
+import io.farewell.toolbox.core.PlayIntegrityFlags
+import io.farewell.toolbox.core.PlayIntegritySetup
 import io.farewell.toolbox.core.RootShell
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,7 +28,9 @@ data class PatchUiState(
     val lastZip: File? = null,
     val lastBackup: File? = null,
     val dataVersion: String? = null,
-    val dataMessage: String = ""
+    val dataMessage: String = "",
+    val keyboxImported: Boolean = false,
+    val integrationMessage: String = ""
 )
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
@@ -36,7 +40,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val device: DeviceProfileInfo = repository.device
 
     private val _state = MutableStateFlow(
-        PatchUiState(dataVersion = DataSync.cachedVersion(application))
+        PatchUiState(
+            dataVersion = DataSync.cachedVersion(application),
+            keyboxImported = PlayIntegritySetup.keyboxImported(application)
+        )
     )
     val state: StateFlow<PatchUiState> = _state
 
@@ -113,6 +120,41 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     dataVersion = result.version,
                     dataMessage = result.message
                 )
+            }
+        }
+    }
+
+    fun applyPlayIntegrity() {
+        viewModelScope.launch {
+            _state.update { it.copy(busy = true, progress = "Applying Play Integrity setup...") }
+            val result = PlayIntegritySetup.apply(getApplication(), PlayIntegrityFlags())
+            _state.update {
+                it.copy(
+                    busy = false,
+                    progress = "",
+                    integrationMessage = result.message,
+                    log = it.log + result.message
+                )
+            }
+        }
+    }
+
+    fun importKeybox(uri: android.net.Uri) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val message = try {
+                val xml = getApplication<android.app.Application>().contentResolver
+                    .openInputStream(uri)?.use { it.readBytes().toString(Charsets.UTF_8) }
+                if (xml != null && PlayIntegritySetup.importKeybox(getApplication(), xml)) {
+                    "Keybox imported"
+                } else {
+                    "Invalid keybox XML (needs PrivateKey + Certificate)"
+                }
+            } catch (throwable: Throwable) {
+                "Keybox import failed: ${throwable.message}"
+            }
+            val imported = PlayIntegritySetup.keyboxImported(getApplication())
+            _state.update {
+                it.copy(keyboxImported = imported, integrationMessage = message, log = it.log + message)
             }
         }
     }

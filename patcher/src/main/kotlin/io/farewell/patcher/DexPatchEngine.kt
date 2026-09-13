@@ -20,6 +20,7 @@ import io.farewell.patcher.rules.MinimumSignatureSchemeRule
 import io.farewell.patcher.rules.SettingsProviderRule
 import io.farewell.patcher.rules.SigningDetailsRule
 import io.farewell.patcher.rules.StrictJarVerifierRule
+import io.farewell.patcher.rules.SystemPropertiesRule
 import io.farewell.patcher.rules.SystemServerInitRule
 import io.farewell.patcher.rules.WindowManagerCaptureRule
 import io.farewell.patcher.rules.WindowSecureRule
@@ -55,6 +56,7 @@ class DexPatchEngine(
     private val methodRules: List<MethodRule> = listOf(
         InstrumentationInitRule(),
         HasSystemFeatureRule(),
+        SystemPropertiesRule(),
         GenerateSoftwareKeyPairRule(),
         GenerateSoftwareKeyPairRule("Landroid/security/keystore/AndroidKeyStoreKeyPairGeneratorSpi;", 0..30),
         CertificateChainRule(),

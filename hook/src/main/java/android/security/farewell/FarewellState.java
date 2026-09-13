@@ -42,6 +42,7 @@ public final class FarewellState {
             sSystemServer = true;
             sContext = systemContext();
             FarewellLog.d("init system_server context=" + sContext);
+            BuildSpoofer.apply(config(), "android");
         } catch (Throwable throwable) {
             FarewellLog.e("initSystemServer", throwable);
         }

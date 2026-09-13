@@ -28,6 +28,15 @@ The app detects device codename, MIUI version and Android API, then picks the pr
 - App-list hiding uses `AppsFilter` (MIUI 13/14) and `PackageManagerService.filterAppAccess*` (MIUI 12).
 - The flashable zip clears the prebuilt boot artifacts (`boot-framework.*` in `framework/arm[64]` and `framework/oat/arm[64]`, `services.*`) plus dalvik caches, so ART re-verifies and recompiles the patched jars on first boot.
 
+### Play Integrity / Play Store certification
+
+- `Apply Play Integrity setup` in the app writes a single `farewell_config` JSON into `Settings.Global` (via root):
+  - `build`: PIF Build fields applied to `com.google.android.gms`, `com.android.vending`, `com.google.android.gsf` (from the synced `Pif-props.json`).
+  - `props`: `SystemProperties.get` overrides (`ro.build.fingerprint`, `ro.product.*`, `ro.build.version.security_patch`).
+  - `flags`: hidden developer status, hidden app list, FLAG_SECURE and keybox spoof.
+- Keybox XML can be imported from the device and is stored in `farewell_keybox`; `KeyboxEngine` replaces the attested certificate chain when enabled.
+- `Build` fields are also unfinalized and spoofed in `system_server` (`initSystemServer`) so GMS/Play Store checks in system processes see the same identity.
+
 ## 🛠️ Building
 
 Requirements: JDK 17+ and Android SDK (platform 37, build-tools 36/37).
