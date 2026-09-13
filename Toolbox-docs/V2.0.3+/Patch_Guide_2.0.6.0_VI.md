@@ -294,9 +294,52 @@ Tự đổi tên register và cách return “không có setting” theo ROM đ�
 còn cleanup sau khi tạo `vValue`, giữ nguyên cleanup và chỉ chèn hai hook trước
 lệnh return thật.
 
+#### Kiểm tra patch cho tính năng nâng cao
+
+Yêu cầu dưới đây áp dụng cho các bản Toolbox/framework có probe kiểm tra patch
+Advanced. Bản cũ chưa có probe không vượt qua kiểm tra, kể cả khi báo cùng
+framework version.
+
+1. Cài Toolbox APK và DEX framework tương thích, **có hỗ trợ probe**.
+2. Patch đường GET thật của SettingsProvider cho **cả ba bảng**: `global`,
+   `secure`, `system`. Gọi `shouldRemoveSetting` trước, rồi `filterSettingValue`
+   nếu removal trả false, trên cùng provider thread như ví dụ bên trên.
+3. Bao phủ cả key chưa tồn tại và giá trị đã có. Không để nhánh return sớm khi
+   thiếu key bỏ qua hai hook. Giữ nguyên kiểm tra quyền, Binder caller identity
+   và cleanup bắt buộc của ROM.
+4. Reboot sau khi cập nhật framework/provider patch, mở lại Toolbox và đợi
+   kiểm tra hoàn tất trước khi bật **tính năng nâng cao**.
+
+App yêu cầu framework version không rỗng và gửi challenge mới, chỉ đọc, qua
+Settings reader của từng bảng. Probe chỉ trả lời khi cả hai hook thấy cùng
+namespace/key trên cùng thread. Probe chạy trước HMA/config reads, không cần
+bật Advanced trước, không ghi setting thử và không tin working flag lưu sẵn.
+
+| Trường hợp | Hành vi mong đợi |
+|---|---|
+| Đang kiểm tra hoặc đang ghi công tắc | Khóa công tắc |
+| Framework thiếu/cũ, thiếu hook/bảng hoặc đọc probe lỗi | Advanced không khả dụng; hiện thông báo cần patch |
+| Framework tương thích và probe đủ ba bảng pass | Cho thao tác công tắc; bật vẫn cần quyền ghi |
+| Bật root fallback nhưng probe fail | Vẫn chặn bật trước mọi nhánh ghi fallback |
+| Cờ Advanced lưu sẵn là ON nhưng probe fail | UI Advanced vẫn không khả dụng; thao tác đọc không sửa cờ đã lưu |
+| Probe pass nhưng ghi thất bại | Giữ trạng thái công tắc trước đó; báo lỗi ghi |
+
+Cả hai layout Settings dùng chung kiểm tra. App kiểm tra lại trước khi ghi giá
+trị bật; `true`/`TRUE` và khoảng trắng theo quy tắc Java được hiểu thống nhất với
+parser boolean của framework. Probe không chặn thao tác tắt tại API ghi, nhưng
+quyền ghi/block policy vẫn áp dụng. Framework cũ/thiếu API sync cache không làm
+một lần ghi trực tiếp vào Settings đã thành công bị báo thất bại.
+
+Nếu công tắc vẫn khóa, kiểm tra framework đang chạy có probe, hai call site có
+thực thi với key chưa tồn tại ở từng bảng và thiết bị đã reboot vào các file đã
+patch. Không tạo sẵn probe key hoặc ép cờ Advanced để lách kiểm tra. Chỉ có
+framework version hay root là chưa đủ. Probe xác nhận capability Settings,
+không xác nhận hook AppsFilter/installer-source và không phải chứng thực bảo
+mật chống hệ thống đã bị sửa/root.
+
 #### Cấu hình trong Toolbox
 
-Bật **tính năng nâng cao**, sau đó thêm entry trong Toolbox. Dữ liệu dùng format
+Sau khi kiểm tra patch pass, bật **tính năng nâng cao**, rồi thêm entry trong Toolbox. Dữ liệu dùng format
 version 2, tách từng app theo bảng:
 
 ```json
@@ -312,14 +355,24 @@ version 2, tách từng app theo bảng:
 }
 ```
 
-Framework sẽ fail-open về giá trị stock khi Advanced tắt, tên bảng không thuộc
-ba bảng trên, caller là system/Toolbox, UID caller có nhiều package, hoặc không
-có entry khớp. Giá trị spoof theo app luôn là chuỗi; xóa key chỉ do rule Settings
-của HMA cung cấp và phải đi qua nhánh `shouldRemoveSetting(...)` ở trên.
+Nhánh spoof Settings theo app giữ nguyên đầu vào khi Advanced tắt, bảng không
+hợp lệ, caller là system/Toolbox, UID caller có nhiều package hoặc không có entry
+khớp. Đầu vào này có thể đã bị HMA thay đổi: HMA lọc giá trị/xóa key riêng và
+không dùng chung mọi guard. Không mặc định rằng tắt Advanced sẽ trả lại giá trị
+stock cho các rule HMA đã có. Giá trị spoof theo app là chuỗi; xóa key do rule
+Settings của HMA xử lý qua `shouldRemoveSetting(...)` ở trên.
 
 Hãy test một app có cấu hình, một app không cấu hình, cả ba bảng và setting thiếu
 trước khi phát hành. Không dùng hook này để vượt quyền hoặc thay đổi access check
 của SettingsProvider.
+
+Host regression kiểm tra probe/state reader và write gate bằng boundary
+Android/provider giả lập; không chứng minh Binder identity, quyền, Compose hay
+khả năng tương thích ROM thật. Trên ROM đích, cần thử thiếu/patch một phần, root
+fallback khi chưa patch, cờ ON cũ, lỗi quyền ghi, bật/tắt nhanh và cả hai layout
+Settings. Kiểm tra thêm GET bình thường khi config cache còn trống để phát hiện
+đệ quy, và xác nhận probe không tạo key trong DB. Probe pass không thay thế một
+lần kiểm tra runtime đầy đủ.
 
 ### Vô hiệu hóa `FLAG_SECURE`
 

@@ -53,12 +53,26 @@ Follow the detailed usage guide here:
 
 Releases: [Kaorios-Toolbox Releases](https://github.com/hzzmonetvn/Kaorios-Toolbox/releases)
 Old release: [Kaorios-Toolbox old_release](https://github.com/wuang26/Kaorios-Toolbox/releases)
+
+### Advanced features: framework patch required
+
+For builds with the Advanced patch check, use a matching Toolbox APK and framework
+DEX with probe support. Advanced unlocks only after a live check reaches **both
+SettingsProvider hooks** for Global, Secure and System, including missing keys.
+Installing only the APK, loading only the DEX, or enabling root fallback is not
+enough. Apply the ROM call-site patches and reboot.
+
+See the setup and troubleshooting steps in the [English patch guide](Toolbox-docs/V2.0.3+/Patch_Guide_2.0.6.0.md#advanced-features-patch-check)
+or [hướng dẫn tiếng Việt](Toolbox-docs/V2.0.3+/Patch_Guide_2.0.6.0_VI.md#kiểm-tra-patch-cho-tính-năng-nâng-cao).
+This check does not certify AppsFilter/installer-source patches or replace testing
+on the target ROM; a framework version string alone is not proof of hook coverage.
+
 ---
 
 ## 📋 Todo List / Roadmap
 
 - [ ] ⚡ **Automated Patcher Tool 2.0.6+**
-- [ ] ⚙️ **Fake & Filter System Settings**: Granular per-app spoofing and filtering for System, Secure, and Global settings (`filterSettingValue` / `shouldRemoveSetting`).
+- [ ] ⚙️ **ROM validation for Fake & Filter System Settings**: Verify the documented `filterSettingValue` / `shouldRemoveSetting` patches and Advanced capability check on each target ROM.
 - [ ] 📦 **Spoof Installer Source Package**: Spoof package installer origin per-app (`filterInstallerPackageName`, e.g. masquerade as Google Play Store `com.android.vending`).
 
 ---
