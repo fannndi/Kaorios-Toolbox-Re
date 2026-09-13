@@ -98,6 +98,85 @@ object PlayIntegritySetup {
         return true
     }
 
+    fun buildPropOverlay(context: Context): String? {
+        val pifFile = File(context.filesDir, "farewell-data/Pif-props.json")
+        if (!pifFile.exists()) {
+            return null
+        }
+        val pif = runCatching { JSONObject(pifFile.readText()) }.getOrNull() ?: return null
+        val lines = sortedMapOf<String, String>()
+        lines.putAll(devicePropsFrom(pif))
+        lines.putAll(buildableStaticProps)
+        val builder = StringBuilder()
+        builder.append("# Farewell Toolbox PIF prop overlay\n")
+        builder.append("# Drop into system.prop / product.prop of the ROM build.\n")
+        builder.append("# Note: ro.boot.* bootloader props cannot be overridden here.\n")
+        for ((key, value) in lines) {
+            if (key.startsWith("ro.boot.")) continue
+            builder.append(key).append('=').append(value).append('\n')
+        }
+        return builder.toString()
+    }
+
+    private val buildableStaticProps = linkedMapOf(
+        "ro.debuggable" to "0",
+        "ro.secure" to "1",
+        "ro.build.type" to "user",
+        "ro.build.tags" to "release-keys",
+        "ro.build.selinux" to "1"
+    )
+
+    private fun devicePropsFrom(pif: JSONObject): LinkedHashMap<String, String> {
+        val fingerprint = pif.optString("FINGERPRINT", "")
+        val info = parseFingerprint(fingerprint)
+        val brand = pif.optString("BRAND", "").ifEmpty { info?.brand.orEmpty() }
+        val product = pif.optString("PRODUCT", "").ifEmpty { info?.product.orEmpty() }
+        val device = pif.optString("DEVICE", "").ifEmpty { info?.device.orEmpty() }
+        val manufacturer = pif.optString("MANUFACTURER", "").ifEmpty { brand }
+        val model = pif.optString("MODEL", "")
+        val patch = pif.optString("SECURITY_PATCH", "")
+
+        val props = linkedMapOf<String, String>()
+        if (fingerprint.isNotEmpty()) {
+            props["ro.build.fingerprint"] = fingerprint
+        }
+        if (brand.isNotEmpty()) {
+            props["ro.product.brand"] = brand
+            props["ro.product.manufacturer"] = manufacturer
+        }
+        if (product.isNotEmpty()) {
+            props["ro.product.name"] = product
+            props["ro.build.product"] = product
+        }
+        if (device.isNotEmpty()) {
+            props["ro.product.device"] = device
+        }
+        if (model.isNotEmpty()) {
+            props["ro.product.model"] = model
+            props["ro.product.system.model"] = model
+        }
+        info?.let {
+            props["ro.build.description"] =
+                "${it.product}-${it.type} ${it.release} ${it.id} ${it.incremental} ${it.tags}"
+            props["ro.build.tags"] = it.tags
+            props["ro.build.type"] = it.type
+            props["ro.system.build.tags"] = it.tags
+            props["ro.system.build.type"] = it.type
+        }
+        if (patch.isNotEmpty()) {
+            props["ro.build.version.security_patch"] = patch
+            props["ro.vendor.build.security_patch"] = patch
+            props["ro.system.build.version.security_patch"] = patch
+            props["ro.build.version.real_security_patch"] = patch
+        }
+        for (part in listOf("odm", "vendor", "product", "system_ext")) {
+            for (field in listOf("model", "brand", "manufacturer", "device", "name")) {
+                props["ro.product.$part.$field"] = ""
+            }
+        }
+        return props
+    }
+
     private fun buildConfig(pif: JSONObject, flags: PlayIntegrityFlags, hasKeybox: Boolean): String {
         val root = JSONObject()
 

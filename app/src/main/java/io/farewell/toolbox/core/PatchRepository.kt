@@ -112,10 +112,10 @@ class PatchRepository(private val context: Context) {
         BuildResult(patchZip, backupZip, report.toString())
     }
 
-    fun exportToDownloads(file: File, displayName: String): String {
+    fun exportToDownloads(file: File, displayName: String, mimeType: String = "application/zip"): String {
         val values = ContentValues().apply {
             put(MediaStore.Downloads.DISPLAY_NAME, displayName)
-            put(MediaStore.Downloads.MIME_TYPE, "application/zip")
+            put(MediaStore.Downloads.MIME_TYPE, mimeType)
             put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/Farewell")
         }
         val resolver = context.contentResolver

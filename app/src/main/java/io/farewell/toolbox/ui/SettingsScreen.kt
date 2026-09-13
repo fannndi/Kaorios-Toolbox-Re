@@ -66,6 +66,13 @@ fun SettingsScreen(state: PatchUiState, viewModel: MainViewModel, modifier: Modi
                 ) {
                     Text(if (state.keyboxImported) "Replace keybox XML" else "Import keybox XML")
                 }
+                OutlinedButton(
+                    onClick = { viewModel.exportPropOverlay() },
+                    enabled = !state.busy,
+                    modifier = Modifier.padding(top = 8.dp)
+                ) {
+                    Text("Export ROM prop overlay")
+                }
                 if (state.integrationMessage.isNotEmpty()) {
                     Text(state.integrationMessage, style = MaterialTheme.typography.bodySmall)
                 }

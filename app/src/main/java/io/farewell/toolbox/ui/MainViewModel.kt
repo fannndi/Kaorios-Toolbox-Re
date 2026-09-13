@@ -155,6 +155,25 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun exportPropOverlay() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val content = PlayIntegritySetup.buildPropOverlay(getApplication())
+            if (content == null) {
+                _state.update { it.copy(integrationMessage = "Pif-props.json not synced yet") }
+                return@launch
+            }
+            val message = try {
+                val file = File(getApplication<android.app.Application>().cacheDir, "pif_overlay.prop")
+                file.writeText(content)
+                repository.exportToDownloads(file, "pif_overlay.prop", "text/plain")
+                "Exported pif_overlay.prop to Downloads/Farewell"
+            } catch (throwable: Throwable) {
+                "Overlay export failed: ${throwable.message}"
+            }
+            _state.update { it.copy(integrationMessage = message, log = it.log + message) }
+        }
+    }
+
     fun importKeybox(uri: android.net.Uri) {
         viewModelScope.launch(Dispatchers.IO) {
             val message = try {
