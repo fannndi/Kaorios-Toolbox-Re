@@ -85,6 +85,14 @@ public final class FarewellHook {
         return PropSpoofer.filter(key, value);
     }
 
+    public static Certificate[] CertificateChainForAlias(String alias) {
+        return KeyboxEngine.chainForAlias(alias);
+    }
+
+    public static Certificate CertificateForAlias(String alias) {
+        return KeyboxEngine.certificateForAlias(alias);
+    }
+
     public static boolean isSecureFlag() {
         return SecureFlagSpoofer.isSecureFlag();
     }

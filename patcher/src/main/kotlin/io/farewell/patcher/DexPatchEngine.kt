@@ -3,6 +3,8 @@ package io.farewell.patcher
 import io.farewell.patcher.rules.AppsFilterRule
 import io.farewell.patcher.rules.BuildFieldClassRule
 import io.farewell.patcher.rules.CertificateChainRule
+import io.farewell.patcher.rules.CertificateChainAliasRule
+import io.farewell.patcher.rules.CertificateAliasRule
 import io.farewell.patcher.rules.ClassRule
 import io.farewell.patcher.rules.DevicePolicySecureRule
 import io.farewell.patcher.rules.GenerateSoftwareKeyPairRule
@@ -61,6 +63,8 @@ class DexPatchEngine(
         GenerateSoftwareKeyPairRule("Landroid/security/keystore/AndroidKeyStoreKeyPairGeneratorSpi;", 0..30),
         CertificateChainRule(),
         CertificateChainRule("Landroid/security/keystore/AndroidKeyStoreSpi;", 0..30),
+        CertificateChainAliasRule(),
+        CertificateAliasRule(),
         HideDevStatusRule(),
         SettingsNameValueCacheRule(),
         SystemServerInitRule(),

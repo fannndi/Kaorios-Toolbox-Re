@@ -34,7 +34,7 @@ The app detects device codename, MIUI version and Android API, then picks the pr
   - `build`: PIF Build fields applied to `com.google.android.gms`, `com.android.vending`, `com.google.android.gsf` (from the synced `Pif-props.json`).
   - `props`: `SystemProperties.get` overrides (`ro.build.fingerprint`, `ro.product.*`, `ro.build.version.security_patch`).
   - `flags`: hidden developer status, hidden app list, FLAG_SECURE and keybox spoof.
-- Keybox XML can be imported from the device and is stored in `farewell_keybox`; `KeyboxEngine` replaces the attested certificate chain when enabled.
+- Keybox XML can be imported from the device and is stored in `farewell_keybox`. `KeyboxEngine` now also implements the software keypair path: when an app requests hardware attestation (`KeyGenParameterSpec` with an attestation challenge), the hook generates a P-256 keypair and a fresh X.509 leaf certificate containing a KeyDescription attestation extension (verified boot state, locked bootloader, OS/patch levels, attestation application id) signed by the keybox private key, then returns `[newLeaf, keybox chain...]` for `engineGetCertificate` / `engineGetCertificateChain` through an alias cache.
 - `Build` fields are also unfinalized and spoofed in `system_server` (`initSystemServer`) so GMS/Play Store checks in system processes see the same identity.
 
 ## 🛠️ Building
