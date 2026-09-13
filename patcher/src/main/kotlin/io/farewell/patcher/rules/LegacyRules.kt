@@ -33,7 +33,7 @@ class SettingsNameValueCacheRule : MethodRule {
             Asm.invokeStatic(
                 intArrayOf(cacheRegister, nameRegister, userRegister),
                 Asm.methodRef(
-                    HOOK_CLASS, "hasSettingOverride",
+                    HOOK_CLASS, HookContract.HAS_SETTING_OVERRIDE,
                     listOf("Ljava/lang/Object;", HookContract.STRING, "I"), "Z"
                 )
             ),
@@ -42,7 +42,7 @@ class SettingsNameValueCacheRule : MethodRule {
             Asm.invokeStatic(
                 intArrayOf(cacheRegister, nameRegister),
                 Asm.methodRef(
-                    HOOK_CLASS, "settingOverrideValue",
+                    HOOK_CLASS, HookContract.SETTING_OVERRIDE_VALUE,
                     listOf("Ljava/lang/Object;", HookContract.STRING), HookContract.STRING
                 )
             ),

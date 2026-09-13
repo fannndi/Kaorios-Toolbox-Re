@@ -49,31 +49,57 @@ dependencies {
     d8(libs.r8)
 }
 
+val obfuscate = providers.gradleProperty("hookObfuscate").map { it.toBoolean() }.getOrElse(true)
+
 val hookOutputDir = rootProject.layout.buildDirectory.dir("hook")
+val identityFile = rootProject.layout.buildDirectory.file("hook-identity.txt")
 
 val makeHookDex by tasks.registering(JavaExec::class) {
     group = "farewell"
-    description = "Compiles the framework hook library into hook.dex using D8"
+    description = "Compiles the framework hook into hook.dex using R8 (obfuscated) or D8"
 
     val jarTask = tasks.named<Jar>("jar")
     val jarFile = jarTask.flatMap { it.archiveFile }
     val outDir = hookOutputDir
 
-    dependsOn(jarTask)
+    dependsOn(jarTask, ":generateHookIdentity")
     inputs.file(jarFile)
     inputs.file(androidJar)
+    inputs.file(identityFile)
+    inputs.property("obfuscate", obfuscate)
     outputs.dir(outDir)
 
     classpath = d8
-    mainClass.set("com.android.tools.r8.D8")
+    mainClass.set(if (obfuscate) "com.android.tools.r8.R8" else "com.android.tools.r8.D8")
 
     argumentProviders.add(object : CommandLineArgumentProvider {
-        override fun asArguments(): Iterable<String> = listOf(
-            "--min-api", "29",
-            "--output", outDir.get().asFile.absolutePath,
-            "--lib", androidJar.absolutePath,
-            jarFile.get().asFile.absolutePath
-        )
+        override fun asArguments(): Iterable<String> {
+            val arguments = mutableListOf<String>()
+            if (obfuscate) {
+                val className = identityFile.get().asFile.readText().trim()
+                    .split(";").first().substringBefore(":")
+                val rulesFile = File(outDir.get().asFile, "r8-rules.pro")
+                rulesFile.parentFile.mkdirs()
+                rulesFile.writeText(
+                    buildString {
+                        appendLine("-keep public class android.security.keystore2.$className { public *; }")
+                        appendLine("-keepattributes Signature,Exceptions,InnerClasses,EnclosingMethod,*Annotation*")
+                        appendLine("-repackageclasses 'o'")
+                        appendLine("-allowaccessmodification")
+                        appendLine("-dontwarn **")
+                        appendLine("-dontoptimize")
+                    }
+                )
+                arguments += listOf("--release", "--pg-conf", rulesFile.absolutePath)
+            }
+            arguments += listOf(
+                "--min-api", "29",
+                "--output", outDir.get().asFile.absolutePath,
+                "--lib", androidJar.absolutePath,
+                jarFile.get().asFile.absolutePath
+            )
+            return arguments
+        }
     })
 
     doFirst {
@@ -83,9 +109,10 @@ val makeHookDex by tasks.registering(JavaExec::class) {
 
     doLast {
         val produced = File(outDir.get().asFile, "classes.dex")
-        check(produced.exists()) { "D8 did not produce a dex file" }
+        check(produced.exists()) { "Dex compiler did not produce a dex file" }
         val target = File(outDir.get().asFile, "hook.dex")
         if (target.exists()) target.delete()
         check(produced.renameTo(target)) { "Could not rename hook dex" }
+        File(outDir.get().asFile, "r8-rules.pro").delete()
     }
 }

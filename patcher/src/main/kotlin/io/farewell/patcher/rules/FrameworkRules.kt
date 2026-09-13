@@ -42,7 +42,7 @@ class HasSystemFeatureRule : MethodRule {
 
     override fun applyMethod(classDef: ClassDef, method: Method, impl: MutableMethodImplementation): Boolean {
         if (classDef.type != "Landroid/app/ApplicationPackageManager;") return false
-        if (method.name != HookContract.HAS_SYSTEM_FEATURE || method.returnType != "Z") return false
+        if (method.name != "hasSystemFeature" || method.returnType != "Z") return false
         val params = method.parameterTypesList()
         if (params != listOf(HookContract.STRING, "I")) return false
         if (!method.hasLocalRegister()) return false

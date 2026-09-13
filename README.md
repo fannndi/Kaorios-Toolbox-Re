@@ -50,6 +50,20 @@ What was adopted from AlwaysStrong's strategy:
 
 Known limitation of the rootless model: native property reads (`__system_property_get` used by DroidGuard's native code) cannot be intercepted from framework Java; Zygisk/PLT hooks would be required for that layer. Java-level reads (`SystemProperties.get/getInt/getLong/getBoolean`, `Build` fields) are covered.
 
+### Stealth hardening
+
+- **Per-build randomized hook identity.** `:generateHookIdentity` produces `KeyStoreCompat<hex>` plus random method names for all 21 hook entry points; both the generated Java facade and the patcher constants come from that single source. `Class.forName` scanning or hardcoded string matching for a known hook class fails. Use `./gradlew -PrenewHookIdentity :app:assembleDebug` (or delete `build/hook-identity.txt`) to rotate the identity for a release.
+- **R8-obfuscated hook dex.** The hook is compiled with R8 (`-repackageclasses 'o'`) while the entry class + members are kept, so helper class names (`HookState`, `KeyboxEngine`, `AttestationBuilder`, …) no longer exist as strings in the flashed artifacts. `./gradlew -PhookObfuscate=false` falls back to plain D8 for debugging.
+- **Obfuscated configuration transport.** `sys_keystore_cfg` and `sys_keybox_cfg` values are stored as `k2:` base64+XOR blobs, so `settings list global` never shows readable PIF/keybox payloads.
+- **Authentic attestation identity.** The generated leaf contains `ATTESTATION_ID_BRAND/DEVICE/PRODUCT/MANUFACTURER/MODEL`, a real APK signing-certificate digest in `attestationApplicationId`, a derived `verifiedBootHash` (never all-zero), `RootOfTrust` encoded in the official order (`verifiedBootKey`, `deviceLocked`, `verifiedBootState`, `verifiedBootHash`) and `attestationVersion` 3 on Android 10–11 / 4 on Android 12+.
+
+### ROM audit (per-file, MIUI 12 / 13 / 14)
+
+- All patched targets exist and all rules apply (MIUI12: framework 14 / services 6; MIUI13/14: framework 15 / services 6). Two expected absences on MIUI 12 (Android 10): `ApkSignatureVerifier.getMinimumSignatureSchemeVersionForTargetSdk` and `AppsFilter.shouldFilterApplication` (the app-filter path there is `PackageManagerService.filterAppAccessLPr`).
+- Target jars use DEX 039 on all three ROMs; the A17-only 040 normalization never triggers.
+- The update script deletes exactly the boot artifacts that exist (`boot-framework.*` under `framework/arm[64]`, `framework/oat/arm64/services.*`); `miui-services`/`boot-miui-framework` artifacts are left alone because those jars are not patched.
+- `SettingsProvider.apk` is untouched on all three ROMs.
+
 ## 🛠️ Building
 
 Requirements: JDK 17+ and Android SDK (platform 37, build-tools 36/37).

@@ -30,7 +30,7 @@ class CertificateChainAliasRule : MethodRule {
             Asm.invokeStatic(
                 intArrayOf(aliasRegister),
                 Asm.methodRef(
-                    HOOK_CLASS, "CertificateChainForAlias",
+                    HOOK_CLASS, HookContract.CERTIFICATE_CHAIN_FOR_ALIAS,
                     listOf(HookContract.STRING), HookContract.CERTIFICATE_ARRAY
                 )
             ),
@@ -61,7 +61,7 @@ class CertificateAliasRule : MethodRule {
             Asm.invokeStatic(
                 intArrayOf(aliasRegister),
                 Asm.methodRef(
-                    HOOK_CLASS, "CertificateForAlias",
+                    HOOK_CLASS, HookContract.CERTIFICATE_FOR_ALIAS,
                     listOf(HookContract.STRING), "Ljava/security/cert/Certificate;"
                 )
             ),

@@ -121,8 +121,9 @@ final class AttestationBuilder {
                 ? identity.bootHash
                 : new byte[32];
         teeItems.add(Der.explicit(704, Der.sequence(
-                Der.enumerated(0),
+                Der.octetString(bootHash),
                 Der.booleanValue(true),
+                Der.enumerated(0),
                 Der.octetString(bootHash)
         )));
         teeItems.add(Der.explicit(705, Der.integer(Build.VERSION.SDK_INT)));
@@ -139,8 +140,10 @@ final class AttestationBuilder {
 
         byte[] teeEnforced = Der.sequence(teeItems.toArray(new byte[0][]));
 
+        int attestationVersion = Build.VERSION.SDK_INT >= 31 ? 4 : 3;
+
         return Der.sequence(
-                Der.integer(4),
+                Der.integer(attestationVersion),
                 Der.enumerated(1),
                 Der.integer(4),
                 Der.enumerated(1),

@@ -37,12 +37,12 @@ class FilterAppAccessRule : MethodRule {
     override fun enabledFor(kind: JarKind) = kind == JarKind.SERVICES
 
     private val stringHook = Asm.methodRef(
-        HOOK_CLASS, "combineAppFilter",
+        HOOK_CLASS, HookContract.COMBINE_APP_FILTER,
         listOf("I", HookContract.STRING, "I", "Z"), "Z"
     )
 
     private val objectHook = Asm.methodRef(
-        HOOK_CLASS, "combineAppFilterForObject",
+        HOOK_CLASS, HookContract.COMBINE_APP_FILTER_OBJECT,
         listOf("I", "Ljava/lang/Object;", "I", "Z"), "Z"
     )
 

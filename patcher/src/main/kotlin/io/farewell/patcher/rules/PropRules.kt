@@ -63,7 +63,7 @@ class SystemPropertiesPrimitiveRule : MethodRule {
         val instructions = mutableListOf<BuilderInstruction>()
         instructions += Asm.invokeStatic(
             intArrayOf(keyRegister),
-            Asm.methodRef(HOOK_CLASS, "propOverride", listOf(HookContract.STRING), HookContract.STRING)
+            Asm.methodRef(HOOK_CLASS, HookContract.PROP_OVERRIDE, listOf(HookContract.STRING), HookContract.STRING)
         )
         instructions += Asm.moveResultObject(keyRegister)
         instructions += Asm.ifEqz(keyRegister, label)
