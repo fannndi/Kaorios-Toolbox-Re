@@ -2,7 +2,11 @@ package io.farewell.patcher
 
 import com.android.tools.smali.dexlib2.DexFileFactory
 import com.android.tools.smali.dexlib2.Opcodes
+import io.farewell.patcher.integrity.IntegrityData
+import io.farewell.patcher.integrity.KeyboxVerifier
 import java.io.File
+
+private val INTEGRITY_DIR = File("integrity-data")
 
 fun main(args: Array<String>) {
     var input: File? = null
@@ -12,6 +16,8 @@ fun main(args: Array<String>) {
     var scan = false
     var profile = PlatformProfiles.MODERN
     var grep: Regex? = null
+    var verifyKeybox: File? = null
+    var fetchIntegrity = false
 
     var index = 0
     while (index < args.size) {
@@ -22,10 +28,30 @@ fun main(args: Array<String>) {
             "--kind" -> kind = JarKind.valueOf(args[index + 1].uppercase()).also { index++ }
             "--profile" -> profile = PlatformProfiles.byId(args[index + 1]).also { index++ }
             "--grep" -> grep = Regex(args[index + 1], RegexOption.IGNORE_CASE).also { index++ }
+            "--verify-keybox" -> verifyKeybox = File(args[index + 1]).also { index++ }
+            "--fetch-integrity" -> fetchIntegrity = true
             "--scan" -> scan = true
             else -> error("Unknown argument: ${args[index]}")
         }
         index++
+    }
+
+    if (fetchIntegrity) {
+        val snapshot = IntegrityData.download(INTEGRITY_DIR, force = true)
+        println("Google roots: ${snapshot.rootPems.size}, revoked entries: ${snapshot.revoked.size}")
+        println("root file: ${snapshot.rootFile.absolutePath}")
+        println("status file: ${snapshot.statusFile.absolutePath}")
+        return
+    }
+
+    if (verifyKeybox != null) {
+        val snapshot = IntegrityData.download(INTEGRITY_DIR)
+        val report = KeyboxVerifier.verify(verifyKeybox.readText(), snapshot.rootPems, snapshot.revoked)
+        for (line in report.lines()) {
+            println(line)
+        }
+        println(report.summary())
+        return
     }
 
     val source = input ?: error("--input is required")

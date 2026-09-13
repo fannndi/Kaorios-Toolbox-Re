@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import io.farewell.toolbox.BuildConfig
 import io.farewell.toolbox.core.DataSync
 import io.farewell.toolbox.core.DeviceProfileInfo
+import io.farewell.toolbox.core.IntegrityCheck
 import io.farewell.toolbox.core.PatchRepository
 import io.farewell.toolbox.core.PlayIntegrityFlags
 import io.farewell.toolbox.core.PlayIntegritySetup
@@ -150,6 +151,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     integrationMessage = result.message,
                     dataVersion = DataSync.cachedVersion(getApplication()),
                     log = it.log + result.message
+                )
+            }
+        }
+    }
+
+    fun verifyKeybox() {
+        viewModelScope.launch {
+            _state.update { it.copy(busy = true, progress = "Checking keybox against Google lists...") }
+            val report = IntegrityCheck.verifyImportedKeybox(getApplication())
+            _state.update {
+                it.copy(
+                    busy = false,
+                    progress = "",
+                    integrationMessage = report,
+                    log = it.log + report
                 )
             }
         }

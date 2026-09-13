@@ -73,6 +73,13 @@ fun SettingsScreen(state: PatchUiState, viewModel: MainViewModel, modifier: Modi
                 ) {
                     Text("Export ROM prop overlay")
                 }
+                OutlinedButton(
+                    onClick = { viewModel.verifyKeybox() },
+                    enabled = !state.busy && state.keyboxImported,
+                    modifier = Modifier.padding(top = 8.dp)
+                ) {
+                    Text("Verify keybox (Google lists)")
+                }
                 if (state.integrationMessage.isNotEmpty()) {
                     Text(state.integrationMessage, style = MaterialTheme.typography.bodySmall)
                 }

@@ -27,3 +27,6 @@ Thumbs.db
 
 # Local test artifacts
 build-logs/
+
+# Integrity data cache
+integrity-data/

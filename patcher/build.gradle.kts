@@ -21,6 +21,7 @@ kotlin {
 
 dependencies {
     api(libs.smali.dexlib2)
+    implementation(libs.json)
 }
 
 tasks.named("compileKotlin") {

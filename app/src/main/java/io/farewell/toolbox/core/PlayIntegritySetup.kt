@@ -48,11 +48,12 @@ object PlayIntegritySetup {
     suspend fun apply(context: Context, flags: PlayIntegrityFlags): PlayIntegrityResult = withContext(Dispatchers.IO) {
         val dataDir = File(context.filesDir, "farewell-data")
         val pifFile = File(dataDir, "Pif-props.json")
-        if (!pifFile.exists()) {
-            return@withContext PlayIntegrityResult(false, "Pif-props.json not synced yet")
-        }
-        val pif = runCatching { JSONObject(pifFile.readText()) }.getOrNull()
-            ?: return@withContext PlayIntegrityResult(false, "Pif-props.json is invalid")
+        val pif = when {
+            pifFile.exists() -> runCatching { JSONObject(pifFile.readText()) }.getOrNull()
+            else -> runCatching {
+                JSONObject(context.assets.open("Pif-props.json").use { it.readBytes().toString(Charsets.UTF_8) })
+            }.getOrNull()
+        } ?: return@withContext PlayIntegrityResult(false, "No PIF data (sync failed and no bundled fallback)")
 
         val keyboxFile = File(context.filesDir, KEYBOX_FILE)
         val keybox = if (keyboxFile.exists()) keyboxFile.readText() else null
@@ -99,11 +100,14 @@ object PlayIntegritySetup {
     }
 
     fun buildPropOverlay(context: Context): String? {
-        val pifFile = File(context.filesDir, "farewell-data/Pif-props.json")
-        if (!pifFile.exists()) {
-            return null
-        }
-        val pif = runCatching { JSONObject(pifFile.readText()) }.getOrNull() ?: return null
+        val dataDir = File(context.filesDir, "farewell-data")
+        val pifFile = File(dataDir, "Pif-props.json")
+        val pif = when {
+            pifFile.exists() -> runCatching { JSONObject(pifFile.readText()) }.getOrNull()
+            else -> runCatching {
+                JSONObject(context.assets.open("Pif-props.json").use { it.readBytes().toString(Charsets.UTF_8) })
+            }.getOrNull()
+        } ?: return null
         val lines = sortedMapOf<String, String>()
         lines.putAll(devicePropsFrom(pif))
         lines.putAll(buildableStaticProps)

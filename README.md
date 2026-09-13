@@ -57,7 +57,23 @@ Known limitation of the rootless model: native property reads (`__system_propert
 - **Obfuscated configuration transport.** `sys_keystore_cfg` and `sys_keybox_cfg` values are stored as `k2:` base64+XOR blobs, so `settings list global` never shows readable PIF/keybox payloads.
 - **Authentic attestation identity.** The generated leaf contains `ATTESTATION_ID_BRAND/DEVICE/PRODUCT/MANUFACTURER/MODEL`, a real APK signing-certificate digest in `attestationApplicationId`, a derived `verifiedBootHash` (never all-zero), `RootOfTrust` encoded in the official order (`verifiedBootKey`, `deviceLocked`, `verifiedBootState`, `verifiedBootHash`) and `attestationVersion` 3 on Android 10–11 / 4 on Android 12+.
 
-### ROM audit (per-file, MIUI 12 / 13 / 14)
+### Offline integrity self-check (Google public endpoints)
+
+The app/CLI can verify a keybox against Google's own published data instead of blindly trusting it:
+
+- `https://android.googleapis.com/attestation/root` — Google attestation root certificates (RSA + the new EC "Key Attestation CA1").
+- `https://android.googleapis.com/attestation/status` — Google's revocation list (~1700 revoked keybox serials with `KEY_COMPROMISE` / `SOFTWARE_FLAW` reasons).
+
+`KeyboxVerifier` (pure JVM, in `patcher`) rebuilds the certificate chain, verifies every signature, checks it terminates at a Google root, looks up the leaf serial in the revocation list, and parses the attestation extension (`attestationVersion`, security level, verified boot state, device lock, os/vendor/boot patch levels, attested device IDs, attested application id). The Android app exposes it as **Verify keybox (Google lists)** and reports `valid` / `revoked` / `invalid` with per-field details.
+
+CLI:
+
+```bash
+./gradlew :patcher:run --args="--fetch-integrity"                     # download roots + status list
+./gradlew :patcher:run --args="--verify-keybox /path/keybox.xml"     # verify a keybox offline afterwards
+```
+
+`Toolbox-data/Pif-props.json` now ships a current CANARY Pixel fingerprint (Pixel 8 Pro, security patch 2026-06-05) and the same file is bundled in the APK as a fallback when data sync is unavailable.
 
 - All patched targets exist and all rules apply (MIUI12: framework 14 / services 6; MIUI13/14: framework 15 / services 6). Two expected absences on MIUI 12 (Android 10): `ApkSignatureVerifier.getMinimumSignatureSchemeVersionForTargetSdk` and `AppsFilter.shouldFilterApplication` (the app-filter path there is `PackageManagerService.filterAppAccessLPr`).
 - Target jars use DEX 039 on all three ROMs; the A17-only 040 normalization never triggers.
