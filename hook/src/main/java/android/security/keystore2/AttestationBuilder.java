@@ -9,6 +9,8 @@ import java.security.Signature;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.security.interfaces.ECPublicKey;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Random;
 
 final class AttestationBuilder {
@@ -22,6 +24,16 @@ final class AttestationBuilder {
     private AttestationBuilder() {
     }
 
+    static final class Identity {
+        String brand;
+        String device;
+        String product;
+        String manufacturer;
+        String model;
+        byte[] signatureDigest;
+        byte[] bootHash;
+    }
+
     static X509Certificate build(
             KeyPair keyPair,
             PrivateKey keyboxKey,
@@ -30,7 +42,8 @@ final class AttestationBuilder {
             byte[] subjectDer,
             byte[] challenge,
             String packageName,
-            int patchLevel
+            int patchLevel,
+            Identity identity
     ) {
         try {
             ECPublicKey publicKey = (ECPublicKey) keyPair.getPublic();
@@ -50,7 +63,7 @@ final class AttestationBuilder {
             byte[] signatureAlgorithm = Der.sequence(Der.oid(rsaKeybox ? RSA_SHA256_OID : ECDSA_SHA256_OID));
             BigInteger serial = new BigInteger(63, new Random());
 
-            byte[] keyDescription = keyDescription(challenge, packageName, patchLevel);
+            byte[] keyDescription = keyDescription(challenge, packageName, patchLevel, identity);
 
             byte[] extensions = Der.explicit(3, Der.sequence(
                     Der.sequence(
@@ -85,9 +98,12 @@ final class AttestationBuilder {
         }
     }
 
-    private static byte[] keyDescription(byte[] challenge, String packageName, int patchLevel) {
+    private static byte[] keyDescription(byte[] challenge, String packageName, int patchLevel, Identity identity) {
         if (patchLevel <= 0) {
             patchLevel = patchLevel();
+        }
+        if (identity == null) {
+            identity = new Identity();
         }
 
         byte[] softwareEnforced = Der.sequence(
@@ -100,18 +116,28 @@ final class AttestationBuilder {
                 Der.explicit(702, Der.integer(0))
         );
 
-        byte[] teeEnforced = Der.sequence(
-                Der.explicit(704, Der.sequence(
-                        Der.enumerated(0),
-                        Der.booleanValue(true),
-                        Der.octetString(new byte[32])
-                )),
-                Der.explicit(705, Der.integer(Build.VERSION.SDK_INT)),
-                Der.explicit(706, Der.integer(patchLevel)),
-                Der.explicit(709, Der.octetString(attestationApplicationId(packageName))),
-                Der.explicit(718, Der.integer(patchLevel)),
-                Der.explicit(719, Der.integer(patchLevel))
-        );
+        List<byte[]> teeItems = new ArrayList<>();
+        byte[] bootHash = identity.bootHash != null && identity.bootHash.length == 32
+                ? identity.bootHash
+                : new byte[32];
+        teeItems.add(Der.explicit(704, Der.sequence(
+                Der.enumerated(0),
+                Der.booleanValue(true),
+                Der.octetString(bootHash)
+        )));
+        teeItems.add(Der.explicit(705, Der.integer(Build.VERSION.SDK_INT)));
+        teeItems.add(Der.explicit(706, Der.integer(patchLevel)));
+        teeItems.add(Der.explicit(709, Der.octetString(
+                attestationApplicationId(packageName, identity.signatureDigest))));
+        addIdTag(teeItems, 710, identity.brand);
+        addIdTag(teeItems, 711, identity.device);
+        addIdTag(teeItems, 712, identity.product);
+        addIdTag(teeItems, 716, identity.manufacturer);
+        addIdTag(teeItems, 717, identity.model);
+        teeItems.add(Der.explicit(718, Der.integer(patchLevel)));
+        teeItems.add(Der.explicit(719, Der.integer(patchLevel)));
+
+        byte[] teeEnforced = Der.sequence(teeItems.toArray(new byte[0][]));
 
         return Der.sequence(
                 Der.integer(4),
@@ -125,11 +151,19 @@ final class AttestationBuilder {
         );
     }
 
-    private static byte[] attestationApplicationId(String packageName) {
-        byte[] digest = new byte[32];
+    private static void addIdTag(List<byte[]> items, int tag, String value) {
+        if (value != null && !value.isEmpty()) {
+            items.add(Der.explicit(tag, Der.octetString(value.getBytes())));
+        }
+    }
+
+    private static byte[] attestationApplicationId(String packageName, byte[] signatureDigest) {
         if (packageName == null) {
             packageName = "";
         }
+        byte[] digest = signatureDigest != null && signatureDigest.length > 0
+                ? signatureDigest
+                : new byte[32];
         return Der.sequence(
                 Der.set(Der.sequence(Der.octetString(packageName.getBytes()))),
                 Der.set(Der.octetString(digest))

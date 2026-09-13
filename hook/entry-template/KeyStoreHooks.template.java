@@ -6,9 +6,9 @@ import android.content.Context;
 import java.security.KeyPair;
 import java.security.cert.Certificate;
 
-public final class KeyStoreHooks {
+public final class __CLASS__ {
 
-    private KeyStoreHooks() {
+    private __CLASS__() {
     }
 
     public static void initContext(Context context) {

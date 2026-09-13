@@ -311,7 +311,7 @@ object PlayIntegritySetup {
     }
 
     private fun writeSetting(key: String, value: String): ShellResult {
-        val escaped = value.replace("'", "'\\''")
+        val escaped = Codec.encode(value).replace("'", "'\\''")
         return RootShell.run("settings put global $key '$escaped'", timeoutSeconds = 120)
     }
 

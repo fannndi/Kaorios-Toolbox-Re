@@ -197,9 +197,9 @@ class PatchRepository(private val context: Context) {
     }
 
     companion object {
-        private const val FRAMEWORK_CAT =
+        private val FRAMEWORK_CAT =
             "cat /system/framework/framework.jar 2>/dev/null || cat /system_root/system/framework/framework.jar"
-        private const val MARKER_CLASS = "Landroid/security/keystore2/KeyStoreHooks;"
+        private val MARKER_CLASS = io.farewell.patcher.HookIdentity.HOOK_CLASS
         private const val VERSION_PREFIX = "ks2-"
         private const val VERSION_SCAN_LIMIT = 1 shl 20
     }

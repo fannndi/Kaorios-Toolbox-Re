@@ -34,7 +34,7 @@ public final class HookConfig {
             return EMPTY;
         }
         try {
-            return new HookConfig(new JSONObject(raw));
+            return new HookConfig(new JSONObject(HookCodec.decode(raw)));
         } catch (Throwable throwable) {
             HookLog.e("bad config json", throwable);
             return EMPTY;

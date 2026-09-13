@@ -75,7 +75,8 @@ public final class KeyboxEngine {
                     material.subjectDer,
                     challenge,
                     HookState.currentPackage(),
-                    resolvePatchLevel(config, HookState.currentPackage())
+                    resolvePatchLevel(config, HookState.currentPackage()),
+                    identity(HookState.currentPackage())
             );
             if (leaf == null) {
                 return null;
@@ -135,6 +136,54 @@ public final class KeyboxEngine {
         }
     }
 
+    private static AttestationBuilder.Identity identity(String packageName) {
+        AttestationBuilder.Identity identity = new AttestationBuilder.Identity();
+        try {
+            identity.brand = android.os.Build.BRAND;
+            identity.device = android.os.Build.DEVICE;
+            identity.product = android.os.Build.PRODUCT;
+            identity.manufacturer = android.os.Build.MANUFACTURER;
+            identity.model = android.os.Build.MODEL;
+            identity.bootHash = sha256((android.os.Build.FINGERPRINT + "|"
+                    + android.os.Build.VERSION.SDK_INT + "|"
+                    + android.os.Build.VERSION.SECURITY_PATCH).getBytes("UTF-8"));
+            identity.signatureDigest = signatureDigest(packageName);
+        } catch (Throwable throwable) {
+            HookLog.e("identity", throwable);
+        }
+        return identity;
+    }
+
+    private static byte[] signatureDigest(String packageName) {
+        HookState.beginInternal();
+        try {
+            android.content.Context context = HookState.context();
+            if (context == null || packageName == null) {
+                return null;
+            }
+            android.content.pm.PackageInfo info = context.getPackageManager().getPackageInfo(
+                    packageName, android.content.pm.PackageManager.GET_SIGNING_CERTIFICATES);
+            android.content.pm.Signature[] signatures =
+                    info.signingInfo != null ? info.signingInfo.getApkContentsSigners() : null;
+            if (signatures == null || signatures.length == 0) {
+                return null;
+            }
+            return sha256(signatures[0].toByteArray());
+        } catch (Throwable throwable) {
+            return null;
+        } finally {
+            HookState.endInternal();
+        }
+    }
+
+    private static byte[] sha256(byte[] input) {
+        try {
+            return java.security.MessageDigest.getInstance("SHA-256").digest(input);
+        } catch (Throwable throwable) {
+            return null;
+        }
+    }
+
     private static int resolvePatchLevel(HookConfig config, String packageName) {
         try {
             String value = config.securityPatch(packageName);
@@ -150,7 +199,8 @@ public final class KeyboxEngine {
     private static String readKeybox(Context context) {
         HookState.beginInternal();
         try {
-            return Settings.Global.getString(context.getContentResolver(), HookConfig.KEY_KEYBOX);
+            String raw = Settings.Global.getString(context.getContentResolver(), HookConfig.KEY_KEYBOX);
+            return HookCodec.decode(raw);
         } catch (Throwable throwable) {
             HookLog.e("keybox read", throwable);
             return null;

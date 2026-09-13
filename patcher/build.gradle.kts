@@ -22,3 +22,13 @@ kotlin {
 dependencies {
     api(libs.smali.dexlib2)
 }
+
+tasks.named("compileKotlin") {
+    dependsOn(":generateHookIdentity")
+}
+
+sourceSets {
+    main {
+        java.srcDir(rootProject.layout.buildDirectory.dir("generated/patcher").get().asFile)
+    }
+}

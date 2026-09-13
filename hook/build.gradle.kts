@@ -33,6 +33,16 @@ dependencies {
     compileOnly(files(androidJar))
 }
 
+tasks.named("compileJava") {
+    dependsOn(":generateHookIdentity")
+}
+
+sourceSets {
+    main {
+        java.srcDir(rootProject.layout.buildDirectory.dir("generated/hook").get().asFile)
+    }
+}
+
 val d8: Configuration = configurations.create("d8")
 
 dependencies {
