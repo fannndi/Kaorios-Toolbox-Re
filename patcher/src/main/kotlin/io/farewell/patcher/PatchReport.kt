@@ -25,5 +25,6 @@ enum class JarKind {
     SETTINGS_PROVIDER,
     MIUI_FRAMEWORK,
     MIUI_SERVICES,
+    PROPS,
     OTHER
 }

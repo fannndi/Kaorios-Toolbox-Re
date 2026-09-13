@@ -34,6 +34,17 @@ object PlatformProfiles {
     private const val FRAMEWORK = "system/framework/framework.jar"
     private const val SERVICES = "system/framework/services.jar"
     private const val SETTINGS_PROVIDER = "system/priv-app/SettingsProvider/SettingsProvider.apk"
+    private const val BUILD_PROP = "system/build.prop"
+    private const val PRODUCT_PROP = "product/build.prop"
+    private const val VENDOR_PROP = "vendor/build.prop"
+    private const val ODM_PROP = "vendor/odm/etc/build.prop"
+
+    private val nativePropTargets = listOf(
+        PatchTarget(JarKind.PROPS, BUILD_PROP, required = false),
+        PatchTarget(JarKind.PROPS, PRODUCT_PROP, required = false),
+        PatchTarget(JarKind.PROPS, VENDOR_PROP, required = false),
+        PatchTarget(JarKind.PROPS, ODM_PROP, required = false)
+    )
 
     val SURYA_MIUI12 = PlatformProfile(
         id = "surya-miui12",
@@ -43,7 +54,7 @@ object PlatformProfiles {
         targets = listOf(
             PatchTarget(JarKind.FRAMEWORK, FRAMEWORK),
             PatchTarget(JarKind.SERVICES, SERVICES)
-        )
+        ) + nativePropTargets
     )
 
     val SURYA_MIUI13 = PlatformProfile(
@@ -54,7 +65,7 @@ object PlatformProfiles {
         targets = listOf(
             PatchTarget(JarKind.FRAMEWORK, FRAMEWORK),
             PatchTarget(JarKind.SERVICES, SERVICES)
-        )
+        ) + nativePropTargets
     )
 
     val SURYA_MIUI14 = PlatformProfile(
@@ -65,7 +76,7 @@ object PlatformProfiles {
         targets = listOf(
             PatchTarget(JarKind.FRAMEWORK, FRAMEWORK),
             PatchTarget(JarKind.SERVICES, SERVICES)
-        )
+        ) + nativePropTargets
     )
 
     val MODERN = PlatformProfile(

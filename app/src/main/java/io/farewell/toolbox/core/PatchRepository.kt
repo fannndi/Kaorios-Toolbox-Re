@@ -5,6 +5,7 @@ import android.content.Context
 import android.os.Environment
 import android.provider.MediaStore
 import io.farewell.patcher.FlashZipBuilder
+import io.farewell.patcher.JarKind
 import io.farewell.patcher.JarPatcher
 import io.farewell.patcher.PatchReport
 import kotlinx.coroutines.Dispatchers
@@ -75,9 +76,17 @@ class PatchRepository(private val context: Context) {
 
         val patchedFiles = LinkedHashMap<String, File>()
         val stockFiles = LinkedHashMap<String, File>()
+        val nativeProps = if (device.supportedDevice) {
+            PlayIntegritySetup.buildNativePropMap(context)
+        } else {
+            emptyMap()
+        }
+        if (nativeProps.isNotEmpty()) {
+            step("Native prop patch: ${nativeProps.size} properties")
+        }
 
         for (target in device.profile.targets) {
-            val name = target.systemPath.substringAfterLast('/')
+            val name = target.systemPath.replace('/', '_')
             val stockFile = File(workDir, "${target.kind.name.lowercase()}-stock-$name")
             stockFile.delete()
             step("Pulling /${target.systemPath}")
@@ -92,11 +101,19 @@ class PatchRepository(private val context: Context) {
             stockFiles[target.zipPath] = stockFile
 
             val patchedFile = File(workDir, "${target.kind.name.lowercase()}-patched-$name")
-            step("Patching ${target.kind} (${stockFile.length() / 1024} KB)")
-            val targetReport = JarPatcher.patch(stockFile, patchedFile, target.kind, hookDex, device.profile) {
-                report.append("  [${target.kind}] ").append(it).append('\n')
+            if (target.kind == JarKind.PROPS) {
+                step("Patching ${target.systemPath} (native props)")
+                val original = stockFile.readText()
+                val result = io.farewell.patcher.PropPatcher.apply(original, nativeProps)
+                patchedFile.writeText(result.content)
+                step("  ${result.replaced} replaced, ${result.appended} appended")
+            } else {
+                step("Patching ${target.kind} (${stockFile.length() / 1024} KB)")
+                val targetReport = JarPatcher.patch(stockFile, patchedFile, target.kind, hookDex, device.profile) {
+                    report.append("  [${target.kind}] ").append(it).append('\n')
+                }
+                appendReport(::step, targetReport)
             }
-            appendReport(::step, targetReport)
             patchedFiles[target.zipPath] = patchedFile
         }
 

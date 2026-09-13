@@ -199,6 +199,17 @@ object PlayIntegritySetup {
         }
     }
 
+    fun buildNativePropMap(context: Context): Map<String, String> {
+        val pif = loadPif(context) ?: return emptyMap()
+        val map = LinkedHashMap<String, String>()
+        map.putAll(devicePropsFrom(pif))
+        for ((key, value) in buildableStaticProps) {
+            map[key] = value
+        }
+        map.remove("")
+        return map
+    }
+
     fun buildPropOverlay(context: Context): String? {
         val dataDir = File(context.filesDir, "farewell-data")
         val pifFile = File(dataDir, "Pif-props.json")

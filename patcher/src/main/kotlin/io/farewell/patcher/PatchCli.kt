@@ -18,6 +18,8 @@ fun main(args: Array<String>) {
     var grep: Regex? = null
     var verifyKeybox: File? = null
     var fetchIntegrity = false
+    var patchProp: File? = null
+    var propsFile: File? = null
 
     var index = 0
     while (index < args.size) {
@@ -30,10 +32,26 @@ fun main(args: Array<String>) {
             "--grep" -> grep = Regex(args[index + 1], RegexOption.IGNORE_CASE).also { index++ }
             "--verify-keybox" -> verifyKeybox = File(args[index + 1]).also { index++ }
             "--fetch-integrity" -> fetchIntegrity = true
+            "--patch-prop" -> patchProp = File(args[index + 1]).also { index++ }
+            "--props" -> propsFile = File(args[index + 1]).also { index++ }
             "--scan" -> scan = true
             else -> error("Unknown argument: ${args[index]}")
         }
         index++
+    }
+
+    if (patchProp != null) {
+        val props = propsFile?.takeIf { it.exists() } ?: error("--props <json> is required")
+        val map = LinkedHashMap<String, String>()
+        val json = org.json.JSONObject(props.readText())
+        for (key in json.keys()) {
+            map[key] = json.optString(key, "")
+        }
+        val result = PropPatcher.apply(patchProp.readText(), map)
+        val target = output ?: File(patchProp.parentFile, patchProp.name + ".patched")
+        target.writeText(result.content)
+        println("Prop patch: ${result.replaced} replaced, ${result.appended} appended -> ${target.absolutePath}")
+        return
     }
 
     if (fetchIntegrity) {
