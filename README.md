@@ -20,6 +20,14 @@ Android app that patches `framework.jar` / `services.jar` with the Farewell hook
 
 The app detects device codename, MIUI version and Android API, then picks the profile automatically. Rules are gated by `apiRange`, so legacy (keystore v1, `AppsFilter`, `DevicePolicyCacheImpl.getScreenCaptureDisabled`) and modern (keystore2, `AppsFilterBase`, WMS capture) patch sets stay separate and maintainable.
 
+### ROM audit notes (surya MIUI 12 / 13 / 14)
+
+- Patch targets live in `/system/framework/framework.jar` and `/system/framework/services.jar`. `miui-framework.jar` (boot classpath), `miui-services.jar` and `miuix.jar` contain no copies of the patched classes, so they stay untouched.
+- `SettingsProvider.apk` is never modified. Settings spoof/removal/probe hooks `Settings$NameValueCache.getStringForUser` client-side, which exists in all three ROMs and covers both app and system_server reads.
+- Installer spoof uses `PackageManagerService.getInstallerPackageName(String)` on MIUI 12/13/14 and `ComputerEngine` on Android 13+.
+- App-list hiding uses `AppsFilter` (MIUI 13/14) and `PackageManagerService.filterAppAccess*` (MIUI 12).
+- The flashable zip clears the prebuilt boot artifacts (`boot-framework.*` in `framework/arm[64]` and `framework/oat/arm[64]`, `services.*`) plus dalvik caches, so ART re-verifies and recompiles the patched jars on first boot.
+
 ## 🛠️ Building
 
 Requirements: JDK 17+ and Android SDK (platform 37, build-tools 36/37).

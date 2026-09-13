@@ -65,6 +65,8 @@ private fun scanJar(source: File) {
         "Lcom/android/server/pm/AppsFilterImpl;",
         "Lcom/android/server/pm/AppsFilter;",
         "Lcom/android/server/pm/ComputerEngine;",
+        "Lcom/android/server/pm/PackageManagerService;",
+        "Lcom/android/server/pm/InstallPackageHelper;",
         "Lcom/android/server/SystemServer;",
         "Landroid/os/Build;",
         "Landroid/os/Build\$VERSION;",

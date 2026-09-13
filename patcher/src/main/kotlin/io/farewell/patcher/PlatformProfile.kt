@@ -42,8 +42,7 @@ object PlatformProfiles {
         miui = MiuiMajor.MIUI12,
         targets = listOf(
             PatchTarget(JarKind.FRAMEWORK, FRAMEWORK),
-            PatchTarget(JarKind.SERVICES, SERVICES),
-            PatchTarget(JarKind.SETTINGS_PROVIDER, SETTINGS_PROVIDER, required = false)
+            PatchTarget(JarKind.SERVICES, SERVICES)
         )
     )
 
@@ -54,8 +53,7 @@ object PlatformProfiles {
         miui = MiuiMajor.MIUI13,
         targets = listOf(
             PatchTarget(JarKind.FRAMEWORK, FRAMEWORK),
-            PatchTarget(JarKind.SERVICES, SERVICES),
-            PatchTarget(JarKind.SETTINGS_PROVIDER, SETTINGS_PROVIDER, required = false)
+            PatchTarget(JarKind.SERVICES, SERVICES)
         )
     )
 
@@ -66,8 +64,7 @@ object PlatformProfiles {
         miui = MiuiMajor.MIUI14,
         targets = listOf(
             PatchTarget(JarKind.FRAMEWORK, FRAMEWORK),
-            PatchTarget(JarKind.SERVICES, SERVICES),
-            PatchTarget(JarKind.SETTINGS_PROVIDER, SETTINGS_PROVIDER, required = false)
+            PatchTarget(JarKind.SERVICES, SERVICES)
         )
     )
 
@@ -78,8 +75,7 @@ object PlatformProfiles {
         miui = MiuiMajor.NONE,
         targets = listOf(
             PatchTarget(JarKind.FRAMEWORK, FRAMEWORK),
-            PatchTarget(JarKind.SERVICES, SERVICES),
-            PatchTarget(JarKind.SETTINGS_PROVIDER, SETTINGS_PROVIDER, required = false)
+            PatchTarget(JarKind.SERVICES, SERVICES)
         )
     )
 

@@ -126,12 +126,13 @@ public final class SettingsSpoofer {
             if (name == null || FarewellState.isInternalCall()) {
                 return false;
             }
-            if (FarewellProbe.isProbeName(name)) {
-                return true;
-            }
             String namespace = namespaceOf(nameValueCache);
             if (namespace == null || !TABLES.contains(namespace)) {
                 return false;
+            }
+            if (FarewellProbe.isProbeName(name)) {
+                FarewellProbe.noteRemove(namespace, name);
+                return true;
             }
             FarewellConfig config = FarewellState.config();
             if (config.shouldRemove(namespace, name)) {

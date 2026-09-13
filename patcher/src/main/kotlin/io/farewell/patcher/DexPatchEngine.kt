@@ -12,6 +12,8 @@ import io.farewell.patcher.rules.HOOK_CLASS
 import io.farewell.patcher.rules.ImmutableClassDefBuilder
 import io.farewell.patcher.rules.InstrumentationInitRule
 import io.farewell.patcher.rules.InstallerSourceRule
+import io.farewell.patcher.rules.FilterAppAccessRule
+import io.farewell.patcher.rules.PackageManagerInstallerRule
 import io.farewell.patcher.rules.MessageDigestForceRule
 import io.farewell.patcher.rules.MethodRule
 import io.farewell.patcher.rules.MinimumSignatureSchemeRule
@@ -63,6 +65,8 @@ class DexPatchEngine(
         AppsFilterRule(),
         LegacyAppsFilterRule(),
         InstallerSourceRule(),
+        PackageManagerInstallerRule(),
+        FilterAppAccessRule(),
         SettingsProviderRule(),
         DevicePolicySecureRule(),
         LegacyScreenCaptureRule(),
