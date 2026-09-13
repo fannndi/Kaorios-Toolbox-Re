@@ -90,6 +90,16 @@ object PlayIntegritySetup {
 
     fun keyboxImported(context: Context): Boolean = File(context.filesDir, KEYBOX_FILE).exists()
 
+    fun loadPif(context: Context): JSONObject? {
+        val pifFile = File(context.filesDir, "farewell-data/Pif-props.json")
+        return when {
+            pifFile.exists() -> runCatching { JSONObject(pifFile.readText()) }.getOrNull()
+            else -> runCatching {
+                JSONObject(context.assets.open("Pif-props.json").use { it.readBytes().toString(Charsets.UTF_8) })
+            }.getOrNull()
+        }
+    }
+
     fun importKeybox(context: Context, xml: String): Boolean {
         val trimmed = xml.trim()
         if (!trimmed.contains("<Certificate>") || !trimmed.contains("<PrivateKey>")) {

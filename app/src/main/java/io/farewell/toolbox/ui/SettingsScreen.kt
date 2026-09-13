@@ -80,6 +80,13 @@ fun SettingsScreen(state: PatchUiState, viewModel: MainViewModel, modifier: Modi
                 ) {
                     Text("Verify keybox (Google lists)")
                 }
+                OutlinedButton(
+                    onClick = { viewModel.checkReadiness() },
+                    enabled = !state.busy,
+                    modifier = Modifier.padding(top = 8.dp)
+                ) {
+                    Text("STRONG readiness check")
+                }
                 if (state.integrationMessage.isNotEmpty()) {
                     Text(state.integrationMessage, style = MaterialTheme.typography.bodySmall)
                 }

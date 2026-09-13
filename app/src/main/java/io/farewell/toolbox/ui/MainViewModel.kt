@@ -171,6 +171,21 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun checkReadiness() {
+        viewModelScope.launch {
+            _state.update { it.copy(busy = true, progress = "Running STRONG readiness check...") }
+            val report = IntegrityCheck.readinessReport(getApplication())
+            _state.update {
+                it.copy(
+                    busy = false,
+                    progress = "",
+                    integrationMessage = report,
+                    log = it.log + report
+                )
+            }
+        }
+    }
+
     fun exportPropOverlay() {
         viewModelScope.launch(Dispatchers.IO) {
             val content = PlayIntegritySetup.buildPropOverlay(getApplication())

@@ -75,6 +75,13 @@ CLI:
 
 `Toolbox-data/Pif-props.json` now ships a current CANARY Pixel fingerprint (Pixel 8 Pro, security patch 2026-06-05) and the same file is bundled in the APK as a fallback when data sync is unavailable.
 
+### What Google's own documentation says (and how we use it)
+
+- **Android 13+**: `MEETS_STRONG_INTEGRITY` = `MEETS_DEVICE_INTEGRITY` **plus** OS and vendor security patches from the last 12 months. Our attester stamps `osPatchLevel`/`vendorPatchLevel`/`bootPatchLevel` from the PIF patch, and the app warns when a PIF patch is older than 12 months or older than the device patch.
+- **Android 12 and lower**: `MEETS_STRONG_INTEGRITY` only needs **hardware-backed proof of boot integrity** — no patch recency requirement. That is exactly the MIUI 12/13/14 situation, so a valid keybox + software-generated TEE-level attestation is sufficient.
+- `MEETS_BASIC_INTEGRITY` on Android 13+ only requires that the attestation root of trust is provided by Google — our chain terminates at the Google root bundle.
+- The app's **STRONG readiness check** combines these rules with the keybox verification (chain, revocation, boot state, lock state) and reports what still blocks a STRONG verdict.
+
 - All patched targets exist and all rules apply (MIUI12: framework 14 / services 6; MIUI13/14: framework 15 / services 6). Two expected absences on MIUI 12 (Android 10): `ApkSignatureVerifier.getMinimumSignatureSchemeVersionForTargetSdk` and `AppsFilter.shouldFilterApplication` (the app-filter path there is `PackageManagerService.filterAppAccessLPr`).
 - Target jars use DEX 039 on all three ROMs; the A17-only 040 normalization never triggers.
 - The update script deletes exactly the boot artifacts that exist (`boot-framework.*` under `framework/arm[64]`, `framework/oat/arm64/services.*`); `miui-services`/`boot-miui-framework` artifacts are left alone because those jars are not patched.
