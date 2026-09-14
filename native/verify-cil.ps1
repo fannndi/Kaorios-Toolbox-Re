@@ -8,7 +8,11 @@ $ErrorActionPreference = "Stop"
 
 $fragmentPath = Join-Path $PSScriptRoot "rom\system\etc\selinux\farewell.cil.txt"
 if (-not (Test-Path $fragmentPath)) { throw "CIL fragment not found: $fragmentPath" }
-$fragment = Get-Content $fragmentPath -Raw
+# CIL is compiled on device: CRLF can break the parser, force LF.
+$fragment = (Get-Content $fragmentPath -Raw).Replace("`r`n", "`n")
+if ((Get-Content $fragmentPath -Raw) -match "`r`n") {
+    Write-Host "Note   : fragment had CRLF, normalized to LF for appending" -ForegroundColor Yellow
+}
 
 $candidates = Get-ChildItem -Path $Rom -Recurse -Filter "plat_sepolicy.cil" -File -ErrorAction SilentlyContinue |
     Where-Object { $_.FullName -match "etc[\\/]selinux" } |
@@ -75,7 +79,8 @@ if ($Apply) {
     if ($cil.Contains($marker)) {
         Write-Host "Apply  : skipped (already appended)" -ForegroundColor Yellow
     } else {
-        $newContent = ($cil.TrimEnd() + "`n") + (Get-Content $fragmentPath -Raw)
+        $normalized = $cil.Replace("`r`n", "`n").TrimEnd()
+        $newContent = ($normalized + "`n") + $fragment
         [System.IO.File]::WriteAllText($cilPath, $newContent, (New-Object System.Text.UTF8Encoding($false)))
         Write-Host "Apply  : appended fragment to $cilPath" -ForegroundColor Green
     }

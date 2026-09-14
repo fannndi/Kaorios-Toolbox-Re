@@ -185,14 +185,19 @@ class PatchRepository(private val context: Context) {
         extras: Collection<String>
     ): MutableMap<String, ByteArray> {
         val entries = LinkedHashMap<String, ByteArray>()
-        entries["META-INF/com/google/android/update-binary"] =
-            context.assets.open("zip/installer.sh").use { it.readBytes() }
+        entries["META-INF/com/google/android/update-binary"] = assetText("zip/installer.sh")
         entries["META-INF/com/google/android/updater-script"] = "#dummy\n".toByteArray(Charsets.UTF_8)
-        entries["META-INF/com/ks/mount.sh"] =
-            context.assets.open("zip/META-INF/com/ks/mount.sh").use { it.readBytes() }
+        entries["META-INF/com/ks/mount.sh"] = assetText("zip/META-INF/com/ks/mount.sh")
         entries["manifest.txt"] = manifestFor(stamp, restore, payload + extras)
         return entries
     }
+
+    /** Scripts must be LF-only: CRLF breaks TWRP's /sbin/sh. */
+    private fun assetText(path: String): ByteArray =
+        context.assets.open(path).use { it.readBytes() }
+            .toString(Charsets.UTF_8)
+            .replace("\r\n", "\n")
+            .toByteArray(Charsets.UTF_8)
 
     private fun manifestFor(stamp: String, restore: Boolean, files: Collection<String>): ByteArray {
         val builder = StringBuilder()

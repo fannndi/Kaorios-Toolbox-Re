@@ -1,0 +1,17 @@
+# Keep shell scripts, init rc files and SELinux fragments LF-only:
+# CRLF breaks /sbin/sh, init's rc parser and the CIL compiler on device.
+* text=auto
+*.sh text eol=lf
+*.rc text eol=lf
+*.cil text eol=lf
+*.cil.txt text eol=lf
+*.conf text eol=lf
+*.prop text eol=lf
+*.txt text eol=lf
+native/rom/system/** text eol=lf
+app/src/main/assets/zip/** text eol=lf
+
+# Binaries
+*.dex binary
+*.so binary
+farewelld binary
