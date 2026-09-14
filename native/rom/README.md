@@ -13,6 +13,20 @@ init) see the spoofed values.
 
 ## What the flashable zips contain (built by the app)
 
+Both zips use a **shell `update-binary`** (pattern based on the TWRP shell
+installer by agp2nd / UwuH addon, credits osm0sis@xda-developers) instead of
+edify, so the app can ship a dynamic `manifest.txt`:
+
+```
+# backup=yes|no
+# stamp=<stamp>
+# profile=<profile>
+# delete=<comma separated paths>        (restore zip only)
+system_root/system/framework/framework.jar 0644
+product/build.prop 0644
+...
+```
+
 `Farewell-Patch-<profile>-<stamp>.zip`
 - `system_root/system/framework/framework.jar` (+ `services.jar`) - patched jars
 - `system_root/system/build.prop`, `product/build.prop`, `vendor/build.prop`,
@@ -20,15 +34,25 @@ init) see the spoofed values.
 - `system_root/system/etc/farewell/props.conf` - config for the native helper/daemon
 - `system_root/system/etc/permissions/privapp-permissions-io.farewell.toolbox.xml`
 - `system_root/system/framework/keystore.patch` - patch marker
-- updater-script sets ownership/permissions (`set_perm(0,0,0644,...)`) for every
-  installed file, wipes package cache/dalvik and framework boot artifacts,
-  mounts/remounts `/system`, `/system_ext`, `/product`, `/vendor` rw via
-  `mount.sh` (e2fsck unshare_blocks for shared-block ext4).
+- installer mounts **only the partitions used by the manifest** (surya: MIUI12 has
+  system/product/vendor, MIUI13/14 adds system_ext; no `mi_ext`, `vendor/odm` is
+  inside the vendor partition), using TWRP mounts first and the e2fsck
+  `unshare_blocks` helper (`META-INF/com/ks/mount.sh`) as fallback
+- **flash-time backup**: every file it is about to replace is copied to
+  `/data/media/0/Farewell/backup-<stamp>/` (mirrored paths) together with a
+  generated `restore.sh`; files that do not exist yet (props.conf, privapp XML)
+  are not backed up
+- sets `0:0 0644` per file, wipes package cache/dalvik and framework boot
+  artifacts, aborts without touching anything if an entry cannot be written
 
 `Farewell-Stock-<profile>-<stamp>.zip` (restore)
-- same files/paths but with the **original** contents captured by the app
-- `delete()` removes the privapp permissions XML, marker is reset to `stock`
-- flash it in TWRP if the device bootloops after a patch
+- same paths with the **original** contents captured by the app
+- `# delete=` removes the privapp XML and `props.conf`, marker is reset to `stock`
+- no flash-time backup is created
+
+`native/tests/installer-test.sh` runs the installer end-to-end in a disposable
+Linux/WSL environment (fake mount/unzip) and checks patch, backup, restore.sh,
+stock restore, delete list and the abort path.
 
 ## Native helper protocol (stock mode)
 

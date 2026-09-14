@@ -12,7 +12,13 @@ data class PatchTarget(
     val systemPath: String,
     val required: Boolean = true
 ) {
-    val zipPath: String get() = "system_root/$systemPath"
+    /**
+     * Path of the file inside the flashable zip.
+     * Files on the system partition live under system_root (TWRP mount point),
+     * other dynamic partitions (product/vendor/system_ext/odm) keep their path.
+     */
+    val zipPath: String
+        get() = if (systemPath.startsWith("system/")) "system_root/$systemPath" else systemPath
 }
 
 data class PlatformProfile(
