@@ -63,6 +63,29 @@ fun HomeScreen(state: PatchUiState, viewModel: MainViewModel, modifier: Modifier
 
         Card(modifier = Modifier.fillMaxWidth()) {
             Column(Modifier.padding(16.dp)) {
+                Text("Native service", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(6.dp))
+                InfoRow("Status", state.nativeStatus.ifEmpty { "checking..." })
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "Stock mode runs farewelld through root to set ro.boot.* / write-once props " +
+                        "without touching /system. ROM mode uses /system/bin/farewelld when installed.",
+                    style = MaterialTheme.typography.bodySmall
+                )
+                Spacer(Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onClick = { viewModel.applyNativeProps() }, enabled = !state.busy) {
+                        Text("Apply native props")
+                    }
+                    OutlinedButton(onClick = { viewModel.refreshStatus() }, enabled = !state.busy) {
+                        Text("Re-check")
+                    }
+                }
+            }
+        }
+
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(16.dp)) {
                 Text("Data source", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(6.dp))
                 Text(BuildConfig.DATA_BASE_URL, style = MaterialTheme.typography.bodySmall)

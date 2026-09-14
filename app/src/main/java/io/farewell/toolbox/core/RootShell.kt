@@ -45,4 +45,40 @@ object RootShell {
         val command = "{ $sourceCommand ; } > '${destination.absolutePath}'"
         return run(command, timeoutSeconds)
     }
+
+    fun runWithStdin(command: String, input: ByteArray, timeoutSeconds: Long = 300): ShellResult {
+        return try {
+            val process = ProcessBuilder("su", "-c", command)
+                .redirectErrorStream(true)
+                .start()
+            val writer = Thread {
+                try {
+                    process.outputStream.use { stream ->
+                        stream.write(input)
+                        stream.flush()
+                    }
+                } catch (_: Throwable) {
+                }
+            }
+            writer.isDaemon = true
+            writer.start()
+            val output = StringBuilder()
+            val reader = process.inputStream.bufferedReader()
+            val buffer = CharArray(8192)
+            var read = reader.read(buffer)
+            while (read >= 0) {
+                output.append(buffer, 0, read)
+                read = reader.read(buffer)
+            }
+            val finished = process.waitFor(timeoutSeconds, TimeUnit.SECONDS)
+            if (!finished) {
+                process.destroyForcibly()
+                ShellResult(-1, output.toString(), timedOut = true)
+            } else {
+                ShellResult(process.exitValue(), output.toString())
+            }
+        } catch (throwable: Throwable) {
+            ShellResult(-1, throwable.message ?: "root shell failed")
+        }
+    }
 }

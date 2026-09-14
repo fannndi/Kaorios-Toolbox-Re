@@ -30,3 +30,7 @@ build-logs/
 
 # Integrity data cache
 integrity-data/
+
+# Native daemon build output (binary is committed under native/rom/system/bin)
+native/farewelld/build-*/
+native/out/

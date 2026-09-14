@@ -8,6 +8,7 @@ import io.farewell.toolbox.core.AutoRefresh
 import io.farewell.toolbox.core.DataSync
 import io.farewell.toolbox.core.DeviceProfileInfo
 import io.farewell.toolbox.core.IntegrityCheck
+import io.farewell.toolbox.core.NativeService
 import io.farewell.toolbox.core.PatchRepository
 import io.farewell.toolbox.core.PlayIntegrityFlags
 import io.farewell.toolbox.core.PlayIntegritySetup
@@ -35,7 +36,8 @@ data class PatchUiState(
     val keyboxCount: Int = 0,
     val autoRefresh: Boolean = false,
     val autoRefreshLast: String = "",
-    val integrationMessage: String = ""
+    val integrationMessage: String = "",
+    val nativeStatus: String = ""
 )
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
@@ -63,14 +65,32 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             _state.update { it.copy(busy = true, progress = "Checking root and framework...") }
             val status = repository.detectStatus()
+            val native = NativeService.statusSummary(getApplication())
             _state.update {
                 it.copy(
                     root = status.root,
                     installed = status.installed,
                     installedVersion = status.installedVersion,
                     statusMessage = status.message,
+                    nativeStatus = native,
                     busy = false,
                     progress = ""
+                )
+            }
+        }
+    }
+
+    fun applyNativeProps() {
+        viewModelScope.launch {
+            _state.update { it.copy(busy = true, progress = "Applying native properties via root...") }
+            val message = NativeService.applyStock(getApplication())
+            _state.update {
+                it.copy(
+                    busy = false,
+                    progress = "",
+                    nativeStatus = NativeService.statusSummary(getApplication()),
+                    integrationMessage = message,
+                    log = it.log + "Native props: $message"
                 )
             }
         }

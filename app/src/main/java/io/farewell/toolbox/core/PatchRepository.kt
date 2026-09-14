@@ -84,6 +84,15 @@ class PatchRepository(private val context: Context) {
         if (nativeProps.isNotEmpty()) {
             step("Native prop patch: ${nativeProps.size} properties")
         }
+        val daemonConfig = if (device.supportedDevice) {
+            PlayIntegritySetup.buildDaemonConfig(context)
+        } else {
+            ""
+        }
+        if (daemonConfig.isNotEmpty()) {
+            val entries = daemonConfig.lineSequence().count { it.isNotBlank() && !it.startsWith("#") }
+            step("Native daemon config: $entries properties (system/etc/farewell/props.conf)")
+        }
 
         for (target in device.profile.targets) {
             val name = target.systemPath.replace('/', '_')
@@ -120,11 +129,17 @@ class PatchRepository(private val context: Context) {
         val stamp = SimpleDateFormat("yyyyMMdd-HHmm", Locale.US).format(Date())
         val patchZip = File(workDir, "Farewell-Patch-${device.profile.id}-$stamp.zip")
         step("Building flashable zip")
-        FlashZipBuilder.build(patchZip, templateEntries(stamp), patchedFiles)
+        val patchTemplate = templateEntries(stamp, restore = false, files = patchedFiles.keys)
+        if (daemonConfig.isNotEmpty()) {
+            patchTemplate["system_root/system/etc/farewell/props.conf"] =
+                daemonConfig.toByteArray(Charsets.UTF_8)
+        }
+        FlashZipBuilder.build(patchZip, patchTemplate, patchedFiles)
 
         val backupZip = File(workDir, "Farewell-Stock-${device.profile.id}-$stamp.zip")
-        FlashZipBuilder.build(backupZip, templateEntries(stamp), stockFiles)
+        FlashZipBuilder.build(backupZip, templateEntries(stamp, restore = true, files = stockFiles.keys), stockFiles)
 
+        step("Restore zip: ${backupZip.name}")
         step("Done")
         BuildResult(patchZip, backupZip, report.toString())
     }
@@ -152,17 +167,88 @@ class PatchRepository(private val context: Context) {
         }
     }
 
-    private fun templateEntries(stamp: String): Map<String, ByteArray> {
+    private fun templateEntries(stamp: String, restore: Boolean, files: Collection<String>): MutableMap<String, ByteArray> {
         val entries = LinkedHashMap<String, ByteArray>()
         entries["META-INF/com/google/android/update-binary"] =
             context.assets.open("zip/META-INF/com/google/android/update-binary").use { it.readBytes() }
         entries["META-INF/com/google/android/updater-script"] =
-            context.assets.open("zip/META-INF/com/google/android/updater-script").use { it.readBytes() }
+            scriptFor(stamp, restore, files).toByteArray(Charsets.UTF_8)
         entries["META-INF/com/ks/mount.sh"] =
             context.assets.open("zip/META-INF/com/ks/mount.sh").use { it.readBytes() }
         entries["system_root/system/framework/keystore.patch"] =
-            "ks2 ${device.profile.id} $stamp\n".toByteArray(Charsets.UTF_8)
+            (if (restore) "stock" else "ks2 ${device.profile.id}").plus(" $stamp\n").toByteArray(Charsets.UTF_8)
+        if (!restore) {
+            entries["system_root/system/etc/permissions/privapp-permissions-io.farewell.toolbox.xml"] =
+                context.assets.open("zip/privapp-permissions-io.farewell.toolbox.xml").use { it.readBytes() }
+        }
         return entries
+    }
+
+    private fun scriptFor(stamp: String, restore: Boolean, files: Collection<String>): String {
+        val builder = StringBuilder()
+        val title = if (restore) "Stock restore" else "Framework patch"
+        builder.append("ui_print(\"======================================\");\n")
+        builder.append("ui_print(\"  $title\");\n")
+        builder.append("ui_print(\"======================================\");\n")
+        if (restore) {
+            builder.append("ui_print(\" Restoring originals captured before patching.\");\n")
+        } else {
+            builder.append("ui_print(\" After boot, open the Toolbox app and\");\n")
+            builder.append("ui_print(\" run Apply native props (root helper).\");\n")
+        }
+        builder.append("ui_print(\" Wiping package cache...\");\n")
+        builder.append("run_program(\"/sbin/sh\", \"-c\", \"rm -rf /data/system/package_cache\");\n")
+        builder.append("ui_print(\" Mounting partitions...\");\n")
+        builder.append("package_extract_file(\"META-INF/com/ks/mount.sh\", \"/tmp/mount.sh\");\n")
+        builder.append("set_perm(0, 0, 0777, \"/tmp/mount.sh\");\n")
+        builder.append("run_program(\"/tmp/mount.sh\", \"\");\n")
+        builder.append("delete(\"/tmp/mount.sh\");\n")
+        builder.append("sleep(2);\n")
+
+        builder.append("ui_print(\" ${if (restore) "Restoring" else "Installing"} system files...\");\n")
+        val roots = files.map { it.substringBefore('/') }.toSortedSet()
+        if (roots.isEmpty()) {
+            builder.append("package_extract_dir(\"system_root\", \"/system_root\");\n")
+        } else {
+            for (root in roots) {
+                builder.append("package_extract_dir(\"$root\", \"/$root\");\n")
+            }
+        }
+
+        builder.append("ui_print(\" Setting permissions...\");\n")
+        val paths = files.map { "/$it" }.toMutableSet()
+        paths += "/system_root/system/framework/keystore.patch"
+        paths += "/system_root/system/etc/farewell/props.conf"
+        if (!restore) {
+            paths += "/system_root/system/etc/permissions/privapp-permissions-io.farewell.toolbox.xml"
+        }
+        for (path in paths.sorted()) {
+            builder.append("set_perm(0, 0, 0644, \"$path\");\n")
+        }
+        if (restore) {
+            builder.append("delete(\"/system_root/system/etc/permissions/privapp-permissions-io.farewell.toolbox.xml\");\n")
+        }
+
+        builder.append("ui_print(\" Clearing dalvik cache...\");\n")
+        builder.append("run_program(\"/sbin/sh\", \"-c\", \"rm -rf /data/dalvik-cache /data/misc/apexdata/com.android.art/dalvik-cache\");\n")
+        builder.append("ui_print(\" Clearing boot artifacts...\");\n")
+        builder.append("run_program(\"/sbin/sh\", \"-c\", \"rm -f /system_root/system/framework/boot-framework.vdex\");\n")
+        builder.append(
+            "run_program(\"/sbin/sh\", \"-c\", \"rm -f /system_root/system/framework/arm/boot-framework.art " +
+                "/system_root/system/framework/arm/boot-framework.oat /system_root/system/framework/arm/boot-framework.vdex " +
+                "/system_root/system/framework/arm64/boot-framework.art /system_root/system/framework/arm64/boot-framework.oat " +
+                "/system_root/system/framework/arm64/boot-framework.vdex\");\n"
+        )
+        builder.append(
+            "run_program(\"/sbin/sh\", \"-c\", \"rm -f /system_root/system/framework/oat/arm/services.art " +
+                "/system_root/system/framework/oat/arm/services.odex /system_root/system/framework/oat/arm/services.vdex " +
+                "/system_root/system/framework/oat/arm64/services.art /system_root/system/framework/oat/arm64/services.odex " +
+                "/system_root/system/framework/oat/arm64/services.vdex\");\n"
+        )
+        builder.append("ui_print(\" Unmounting...\");\n")
+        builder.append("run_program(\"/sbin/busybox\", \"umount\", \"/system_root\");\n")
+        builder.append("ui_print(\" Done. Reboot your device.\");\n")
+        return builder.toString()
     }
 
     private fun catCommand(systemPath: String): String =

@@ -78,6 +78,8 @@ object AutoRefresh {
             parts += keyboxNote
         }
 
+        parts += NativeService.applyStock(context)
+
         RootShell.run("am force-stop com.google.android.gms.unstable", 30)
         return "[$stamp] " + parts.joinToString("; ")
     }

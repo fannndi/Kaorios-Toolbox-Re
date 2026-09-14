@@ -1,0 +1,36 @@
+
+;; ============================================================================
+;; Farewell native property service (Stage A)
+;; Append this block to <system>/etc/selinux/plat_sepolicy.cil
+;; Verified against surya MIUI12 (Q), MIUI13/14 (S): all referenced types are
+;; declared in plat_sepolicy.cil and no precompiled_sepolicy is present, so init
+;; recompiles the CIL at boot and picks these rules up.
+;; Use native/verify-cil.ps1 to validate before repacking.
+;; ============================================================================
+
+(type farewelld)
+(typeattributeset domain (farewelld))
+(allow init farewelld (process (transition rlimitinh siginh noatsecure setsched getsched setrlimit)))
+(allow farewelld farewelld (process (dyntransition noatsecure siginh rlimitinh setsched getsched)))
+
+;; init executes /system/bin/farewelld (labeled system_file) with an explicit
+;; seclabel, and the daemon keeps running in its own domain.
+(allow init system_file (file (execute read open getattr map)))
+(allow farewelld system_file (file (read open execute getattr map)))
+(allow farewelld system_file (dir (search read open getattr)))
+(allow farewelld system_file (lnk_file (read getattr)))
+
+;; Path traversal for /system/etc/farewell/props.conf, /dev/kmsg, /dev/__properties__.
+(allow farewelld rootfs (dir (search getattr)))
+(allow farewelld device (dir (search getattr)))
+
+;; Property areas: /dev/__properties__ holds one area per property context.
+(allow farewelld properties_device (dir (search read open getattr)))
+(allow farewelld property_info (file (read open getattr map)))
+(allow farewelld properties_serial (file (read open getattr map)))
+(allow farewelld property_type (file (read write open map getattr)))
+
+;; Diagnostics.
+(allow farewelld kmsg_device (chr_file (read write open getattr)))
+(allow farewelld logdw_socket (sock_file (write open getattr)))
+(allow farewelld logd (unix_stream_socket (connectto)))

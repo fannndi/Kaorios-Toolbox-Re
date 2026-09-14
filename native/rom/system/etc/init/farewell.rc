@@ -1,0 +1,16 @@
+# Farewell native property service.
+# Applies write-once properties (ro.boot.*, ro.secureboot.*, ...) that build.prop
+# cannot override, by updating the property areas directly.
+# Install as /system/etc/init/farewell.rc and keep the binary at /system/bin/farewelld.
+
+service farewelld /system/bin/farewelld
+    class late_start
+    user root
+    group root system
+    seclabel u:r:farewelld:s0
+    disabled
+    priority -20
+    oom_score_adjust -1000
+
+on late-init
+    start farewelld
