@@ -217,6 +217,9 @@ pwsh -File native/build.ps1                         # build farewelld (arm64-v8a
 | `PropPatcherTest` | replace-in-place vs append-at-EOF, `ro.boot.*` blocking, CRLF preservation, and the per-SKU import trap that made the identity spoof a no-op |
 | `PlatformProfileTest` | the per-SKU property targets, per-partition split, surya-only scope, and the "never patch `SettingsProvider.apk` / `miui-*.jar` / `miuix.jar`" invariant |
 | `SpoofRulesTest` | the per-app config shape, asserted against the exact paths `HookConfig` walks |
+| `JarPatcherTest` | the dex engine against synthetic jars (`DexFixture`): a rule fires on its exact signature, the patched body is asserted instruction by instruction, `apiRange` gating keeps a rule dormant below its API level, the hook dex is injected as the next `classesN.dex`, non-dex entries survive, and a re-patch is detected |
+
+Fixtures are built in-process with `DexFixture` (dexlib2), so the dex tests depend on no ROM extraction. A fixture states a signature exactly — descriptor, name, parameters, return type — because that is the contract a rule matches on.
 
 The app module has no JVM unit tests: AGP needs `androidJdkImage` for `compileDebugJavaWithJavac` even with no Java sources, and that transform fails on JDK 26. Any pure logic worth testing belongs in `:patcher` — which is why `SpoofRules` lives there and only file IO stays in the app.
 
