@@ -1,6 +1,7 @@
 package io.farewell.toolbox.core
 
 import android.content.Context
+import io.farewell.patcher.PropPartition
 import io.farewell.patcher.integrity.IntegrityData
 import io.farewell.patcher.integrity.KeyboxVerifier
 import kotlinx.coroutines.Dispatchers
@@ -200,15 +201,20 @@ object PlayIntegritySetup {
     }
 
     fun buildNativePropMap(context: Context): Map<String, String> {
-        val pif = loadPif(context) ?: return emptyMap()
-        val map = LinkedHashMap<String, String>()
-        map.putAll(devicePropsFrom(pif))
-        for ((key, value) in buildableStaticProps) {
-            map[key] = value
+        val map = LinkedHashMap<String, String>(buildUnifiedPropMap(context))
+        if (map.isEmpty()) {
+            return emptyMap()
         }
         map[NativeService.STATUS_PROP] = "off"
         map.remove("")
         return map
+    }
+
+    /** Property map for one partition's build.prop, selected by the flash target. */
+    fun propMapForTarget(context: Context, partition: PropPartition): Map<String, String> {
+        val pif = loadPif(context) ?: return emptyMap()
+        val identity = identityFrom(pif) ?: return emptyMap()
+        return propMapFor(partition, identity)
     }
 
     fun buildDaemonProps(context: Context): Map<String, String> {
@@ -230,17 +236,12 @@ object PlayIntegritySetup {
     }
 
     fun buildPropOverlay(context: Context): String? {
-        val dataDir = File(context.filesDir, "farewell-data")
-        val pifFile = File(dataDir, "Pif-props.json")
-        val pif = when {
-            pifFile.exists() -> runCatching { JSONObject(pifFile.readText()) }.getOrNull()
-            else -> runCatching {
-                JSONObject(context.assets.open("Pif-props.json").use { it.readBytes().toString(Charsets.UTF_8) })
-            }.getOrNull()
-        } ?: return null
+        val unified = buildUnifiedPropMap(context)
+        if (unified.isEmpty()) {
+            return null
+        }
         val lines = sortedMapOf<String, String>()
-        lines.putAll(devicePropsFrom(pif))
-        lines.putAll(buildableStaticProps)
+        lines.putAll(unified)
         val builder = StringBuilder()
         builder.append("# Farewell Toolbox PIF prop overlay\n")
         builder.append("# Drop into system.prop / product.prop of the ROM build.\n")
@@ -274,7 +275,153 @@ object PlayIntegritySetup {
         "sys.oem_unlock_allowed" to "0"
     )
 
-    private fun devicePropsFrom(pif: JSONObject): LinkedHashMap<String, String> {
+    /**
+     * One spoofed device identity, resolved from the PIF JSON.
+     *
+     * Surya MIUI ROMs do not define the plain `ro.product.*` keys in any
+     * build.prop. init derives them at boot from `ro.product.<partition>.<field>`
+     * following `ro.product.property_source_order` (audited: `odm,vendor,product,
+     * product_services,system` on MIUI 12 and `odm,vendor,product,system_ext,system`
+     * on MIUI 13/14). On surya the effective `ro.product.model` therefore comes
+     * from `/vendor/odm/etc/build.prop`, not from `/system/build.prop`.
+     *
+     * Setting only the plain keys is not enough: any reader that asks for
+     * `ro.product.odm.model` (DroidGuard does) still sees the real POCO X3.
+     * So the same values are written to every partition variant — this is the
+     * "prop unification" step.
+     */
+    data class SpoofIdentity(
+        val brand: String,
+        val device: String,
+        val model: String,
+        val product: String,
+        val manufacturer: String,
+        val fingerprint: String,
+        val description: String,
+        val tags: String,
+        val type: String,
+        val id: String,
+        val release: String,
+        val incremental: String,
+        val securityPatch: String
+    ) {
+        val usable: Boolean
+            get() = brand.isNotEmpty() && device.isNotEmpty() && model.isNotEmpty() &&
+                product.isNotEmpty() && fingerprint.isNotEmpty()
+    }
+
+    private fun SpoofIdentity.productValues(): Map<String, String> = mapOf(
+        "brand" to brand,
+        "device" to device,
+        "model" to model,
+        "name" to product,
+        "manufacturer" to manufacturer
+    )
+
+    private fun SpoofIdentity.buildValues(): Map<String, String> = mapOf(
+        "fingerprint" to fingerprint,
+        "tags" to tags,
+        "type" to type,
+        "id" to id,
+        "version.incremental" to incremental,
+        "version.release" to release
+    )
+
+    /**
+     * Property map for one partition's build.prop. Keys are emitted with the
+     * partition prefix that belongs in that file, so `/vendor/odm/etc/build.prop`
+     * only ever receives `ro.product.odm.*` / `ro.odm.build.*`.
+     */
+    fun propMapFor(partition: PropPartition, identity: SpoofIdentity): Map<String, String> {
+        if (!identity.usable) return emptyMap()
+        val part = when (partition) {
+            PropPartition.SYSTEM -> "system"
+            PropPartition.PRODUCT -> "product"
+            PropPartition.SYSTEM_EXT -> "system_ext"
+            PropPartition.VENDOR -> "vendor"
+            PropPartition.ODM -> "odm"
+            PropPartition.OTHER -> return emptyMap()
+        }
+        val map = linkedMapOf<String, String>()
+        for ((field, value) in identity.productValues()) {
+            if (value.isNotEmpty()) {
+                map["ro.product.$part.$field"] = value
+            }
+        }
+        for ((field, value) in identity.buildValues()) {
+            if (value.isNotEmpty()) {
+                map["ro.$part.build.$field"] = value
+            }
+        }
+        if (identity.securityPatch.isNotEmpty()) {
+            map["ro.$part.build.version.security_patch"] = identity.securityPatch
+        }
+
+        when (partition) {
+            // /system/build.prop also owns the unprefixed keys. They must be set
+            // explicitly, otherwise init's product_source_order derivation wins.
+            PropPartition.SYSTEM -> {
+                for ((field, value) in identity.productValues()) {
+                    if (value.isNotEmpty()) {
+                        map["ro.product.$field"] = value
+                    }
+                }
+                map["ro.build.product"] = identity.product
+                map["ro.build.description"] = identity.description
+                map["ro.build.tags"] = identity.tags
+                map["ro.build.type"] = identity.type
+                map["ro.build.id"] = identity.id
+                map["ro.build.version.incremental"] = identity.incremental
+                map["ro.build.version.release"] = identity.release
+                map["ro.build.fingerprint"] = identity.fingerprint
+                if (identity.securityPatch.isNotEmpty()) {
+                    map["ro.build.version.security_patch"] = identity.securityPatch
+                    map["ro.build.version.real_security_patch"] = identity.securityPatch
+                }
+                // Hardening flags.
+                // Audited: MIUI 13/14 declare ro.secure / ro.debuggable /
+                // ro.adb.secure directly in /system/build.prop, so they can be
+                // rewritten here. MIUI 12 does NOT: there is no
+                // /system/default.prop on that ROM and the flags come from the
+                // ramdisk default.prop inside boot.img. Because ro.* properties
+                // are write-once, appending them to build.prop would be ignored —
+                // only the boot-classpath hook (SystemProperties filter) can
+                // answer for them on MIUI 12. They are still emitted here so the
+                // same map drives the daemon and the hook config.
+                map.putAll(buildableStaticProps)
+            }
+            // /vendor/build.prop carries the boot image fingerprint and ro.adb.secure
+            // (the latter actually lives in /vendor/default.prop).
+            PropPartition.VENDOR -> {
+                map["ro.bootimage.build.fingerprint"] = identity.fingerprint
+                map["ro.adb.secure"] = "1"
+            }
+            else -> Unit
+        }
+        return map
+    }
+
+    /** Union of every partition's map — used for the runtime daemon and the overlay export. */
+    fun buildUnifiedPropMap(context: Context): Map<String, String> {
+        val pif = loadPif(context) ?: return emptyMap()
+        val identity = identityFrom(pif) ?: return emptyMap()
+        val map = LinkedHashMap<String, String>()
+        for (partition in listOf(
+            PropPartition.SYSTEM,
+            PropPartition.PRODUCT,
+            PropPartition.SYSTEM_EXT,
+            PropPartition.VENDOR,
+            PropPartition.ODM
+        )) {
+            map.putAll(propMapFor(partition, identity))
+        }
+        for ((key, value) in staticProps) {
+            map[key] = value
+        }
+        return map
+    }
+
+    private fun identityFrom(pif: JSONObject): SpoofIdentity? {
         val fingerprint = pif.optString("FINGERPRINT", "")
         val info = parseFingerprint(fingerprint)
         val brand = pif.optString("BRAND", "").ifEmpty { info?.brand.orEmpty() }
@@ -283,46 +430,31 @@ object PlayIntegritySetup {
         val manufacturer = pif.optString("MANUFACTURER", "").ifEmpty { brand }
         val model = pif.optString("MODEL", "")
         val patch = pif.optString("SECURITY_PATCH", "")
-
-        val props = linkedMapOf<String, String>()
-        if (fingerprint.isNotEmpty()) {
-            props["ro.build.fingerprint"] = fingerprint
+        val tags = info?.tags ?: "release-keys"
+        val type = info?.type ?: "user"
+        val id = info?.id.orEmpty()
+        val release = info?.release.orEmpty()
+        val incremental = info?.incremental.orEmpty()
+        val description = if (info != null) {
+            "${info.product}-${info.type} ${info.release} ${info.id} ${info.incremental} ${info.tags}"
+        } else {
+            ""
         }
-        if (brand.isNotEmpty()) {
-            props["ro.product.brand"] = brand
-            props["ro.product.manufacturer"] = manufacturer
-        }
-        if (product.isNotEmpty()) {
-            props["ro.product.name"] = product
-            props["ro.build.product"] = product
-        }
-        if (device.isNotEmpty()) {
-            props["ro.product.device"] = device
-        }
-        if (model.isNotEmpty()) {
-            props["ro.product.model"] = model
-            props["ro.product.system.model"] = model
-        }
-        info?.let {
-            props["ro.build.description"] =
-                "${it.product}-${it.type} ${it.release} ${it.id} ${it.incremental} ${it.tags}"
-            props["ro.build.tags"] = it.tags
-            props["ro.build.type"] = it.type
-            props["ro.system.build.tags"] = it.tags
-            props["ro.system.build.type"] = it.type
-        }
-        if (patch.isNotEmpty()) {
-            props["ro.build.version.security_patch"] = patch
-            props["ro.vendor.build.security_patch"] = patch
-            props["ro.system.build.version.security_patch"] = patch
-            props["ro.build.version.real_security_patch"] = patch
-        }
-        for (part in listOf("odm", "vendor", "product", "system_ext")) {
-            for (field in listOf("model", "brand", "manufacturer", "device", "name")) {
-                props["ro.product.$part.$field"] = ""
-            }
-        }
-        return props
+        return SpoofIdentity(
+            brand = brand,
+            device = device,
+            model = model,
+            product = product,
+            manufacturer = manufacturer,
+            fingerprint = fingerprint,
+            description = description,
+            tags = tags,
+            type = type,
+            id = id,
+            release = release,
+            incremental = incremental,
+            securityPatch = patch
+        )
     }
 
     private fun buildConfig(pif: JSONObject, flags: PlayIntegrityFlags, hasKeybox: Boolean): String {
@@ -342,7 +474,6 @@ object PlayIntegritySetup {
         val device = pif.optString("DEVICE", "").ifEmpty { info?.device.orEmpty() }
         val manufacturer = pif.optString("MANUFACTURER", "").ifEmpty { brand }
         val model = pif.optString("MODEL", "")
-        val patch = pif.optString("SECURITY_PATCH", "")
 
         val buildExtras = linkedMapOf(
             "TAGS" to (info?.tags ?: "release-keys"),
@@ -360,39 +491,19 @@ object PlayIntegritySetup {
             buildExtras["RELEASE"] = it.release
         }
 
+        // The hook's SystemProperties filter must answer for every partition
+        // variant, not just the plain ro.product.* / ro.build.* keys.
+        val identity = identityFrom(pif)
         val deviceProps = linkedMapOf<String, String>()
-        if (brand.isNotEmpty()) {
-            deviceProps["ro.product.brand"] = brand
-            deviceProps["ro.product.manufacturer"] = manufacturer
-        }
-        if (product.isNotEmpty()) {
-            deviceProps["ro.product.name"] = product
-            deviceProps["ro.build.product"] = product
-        }
-        if (device.isNotEmpty()) {
-            deviceProps["ro.product.device"] = device
-        }
-        if (model.isNotEmpty()) {
-            deviceProps["ro.product.model"] = model
-            deviceProps["ro.product.system.model"] = model
-        }
-        info?.let {
-            deviceProps["ro.build.description"] =
-                "${it.product}-${it.type} ${it.release} ${it.id} ${it.incremental} ${it.tags}"
-            deviceProps["ro.build.tags"] = it.tags
-            deviceProps["ro.build.type"] = it.type
-            deviceProps["ro.system.build.tags"] = it.tags
-            deviceProps["ro.system.build.type"] = it.type
-        }
-        if (patch.isNotEmpty()) {
-            deviceProps["ro.build.version.security_patch"] = patch
-            deviceProps["ro.vendor.build.security_patch"] = patch
-            deviceProps["ro.system.build.version.security_patch"] = patch
-            deviceProps["ro.build.version.real_security_patch"] = patch
-        }
-        for (part in listOf("odm", "vendor", "product", "system_ext")) {
-            for (field in listOf("model", "brand", "manufacturer", "device", "name")) {
-                deviceProps["ro.product.$part.$field"] = ""
+        if (identity != null) {
+            for (partition in listOf(
+                PropPartition.SYSTEM,
+                PropPartition.PRODUCT,
+                PropPartition.SYSTEM_EXT,
+                PropPartition.VENDOR,
+                PropPartition.ODM
+            )) {
+                deviceProps.putAll(propMapFor(partition, identity))
             }
         }
 

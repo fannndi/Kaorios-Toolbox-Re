@@ -12,7 +12,15 @@ data class DeviceProfileInfo(
     val miuiName: String,
     val miuiMajor: MiuiMajor,
     val profile: PlatformProfile,
-    val supportedDevice: Boolean
+    val supportedDevice: Boolean,
+    /**
+     * Value of `ro.boot.product.hardware.sku` (e.g. `surya`, `karna`). Surya MIUI
+     * ROMs import `build_<sku>.prop` from the vendor tree at the end of both
+     * build.prop files, so this decides which property files must be patched for
+     * the spoofed identity to survive the boot. Empty when the ROM does not use
+     * the SKU mechanism.
+     */
+    val hardwareSku: String = ""
 ) {
     val miuiLabel: String
         get() = if (miuiName.isNullOrEmpty()) "MIUI not detected" else "MIUI $miuiName"
@@ -35,8 +43,23 @@ object DeviceDetector {
             miuiName = miuiName,
             miuiMajor = miuiMajor,
             profile = profile,
-            supportedDevice = supported
+            supportedDevice = supported,
+            hardwareSku = detectHardwareSku()
         )
+    }
+
+    /**
+     * `ro.boot.product.hardware.sku` is the key the vendor init script uses to
+     * pick `build_<sku>.prop`. Some builds expose it under the shorter
+     * `ro.boot.hardware.sku`; we accept either and fall back to the device
+     * codename, which is what the SKU equals on every surya-family ROM audited.
+     */
+    private fun detectHardwareSku(): String {
+        val sku = systemProperty("ro.boot.product.hardware.sku")
+        if (sku.isNotBlank()) return sku.trim()
+        val legacy = systemProperty("ro.boot.hardware.sku")
+        if (legacy.isNotBlank()) return legacy.trim()
+        return ""
     }
 
     private fun systemProperty(key: String): String {

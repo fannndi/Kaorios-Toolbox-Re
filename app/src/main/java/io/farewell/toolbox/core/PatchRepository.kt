@@ -8,6 +8,8 @@ import io.farewell.patcher.FlashZipBuilder
 import io.farewell.patcher.JarKind
 import io.farewell.patcher.JarPatcher
 import io.farewell.patcher.PatchReport
+import io.farewell.patcher.PatchTarget
+import io.farewell.patcher.PlatformProfiles
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -82,7 +84,7 @@ class PatchRepository(private val context: Context) {
             emptyMap()
         }
         if (nativeProps.isNotEmpty()) {
-            step("Native prop patch: ${nativeProps.size} properties")
+            step("Runtime prop map: ${nativeProps.size} keys (union of all partitions)")
         }
         val daemonConfig = if (device.supportedDevice) {
             PlayIntegritySetup.buildDaemonConfig(context)
@@ -94,7 +96,26 @@ class PatchRepository(private val context: Context) {
             step("Native daemon config: $entries properties (system/etc/farewell/props.conf)")
         }
 
+        // Per-SKU property files are imported at the very end of /vendor/build.prop
+        // and /vendor/odm/etc/build.prop, so they win over anything we write into
+        // build.prop itself. They must be patched too or the identity spoof is
+        // silently reverted at boot. Deduped because a SKU may appear twice.
+        val targets = LinkedHashMap<String, PatchTarget>()
         for (target in device.profile.targets) {
+            targets[target.systemPath] = target
+        }
+        val skuTargets = PlatformProfiles.skuPropTargets(device.hardwareSku)
+        for (target in skuTargets) {
+            if (!targets.containsKey(target.systemPath)) {
+                targets[target.systemPath] = target
+            }
+        }
+        if (skuTargets.isNotEmpty()) {
+            val skuLabel = device.hardwareSku.ifEmpty { "unknown" }
+            step("SKU prop candidates: ${skuTargets.size} path(s), sku='$skuLabel'")
+        }
+
+        for (target in targets.values) {
             val name = target.systemPath.replace('/', '_')
             val stockFile = File(workDir, "${target.kind.name.lowercase()}-stock-$name")
             stockFile.delete()
@@ -111,9 +132,17 @@ class PatchRepository(private val context: Context) {
 
             val patchedFile = File(workDir, "${target.kind.name.lowercase()}-patched-$name")
             if (target.kind == JarKind.PROPS) {
-                step("Patching ${target.systemPath} (native props)")
+                // Each build.prop only receives the keys that belong to its own
+                // partition: ro.product.odm.* goes to /vendor/odm/etc/build.prop,
+                // never into /system/build.prop.
+                val partitionProps = PlayIntegritySetup.propMapForTarget(context, target.propPartition)
+                if (partitionProps.isEmpty()) {
+                    step("  no spoof props for ${target.propPartition}, skipped")
+                    continue
+                }
+                step("Patching ${target.systemPath} (${target.propPartition} props)")
                 val original = stockFile.readText()
-                val result = io.farewell.patcher.PropPatcher.apply(original, nativeProps)
+                val result = io.farewell.patcher.PropPatcher.apply(original, partitionProps)
                 patchedFile.writeText(result.content)
                 step("  ${result.replaced} replaced, ${result.appended} appended")
             } else {
