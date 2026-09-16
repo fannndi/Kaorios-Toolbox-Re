@@ -54,7 +54,8 @@ import sys
 # the stock surya init binary, which contains the literal templates
 # "/build.prop", "/default.prop" and "/etc/build.prop" (that is how a single
 # template serves both /product/build.prop on Android 10 and
-# /product/etc/build.prop on Android 11+).
+# /product/etc/build.prop on Android 11+). AOSP lists vendor/default.prop before
+# vendor/build.prop, so default.prop is applied first here too.
 PARTITION_ROOTS = [
     "vendor/odm",   # surya mounts odm inside vendor; there is no top-level /odm
     "vendor",
@@ -62,7 +63,7 @@ PARTITION_ROOTS = [
     "system_ext",
     "system",
 ]
-TEMPLATES = ["build.prop", "default.prop", "etc/build.prop"]
+TEMPLATES = ["default.prop", "build.prop", "etc/build.prop"]
 
 # Lowest-priority partition first, so the highest-priority one is applied last.
 # Note: the *within-file* result is exact (inline `import` ordering), while the

@@ -221,6 +221,7 @@ pwsh -File native/build.ps1                         # build farewelld (arm64-v8a
 | `DerReaderTest` | the DER decoder: short/long lengths, multi-byte tag numbers (704–719), integers/enumerated/booleans, nested readers, OID decoding including multi-octet first subidentifiers, and clean failures on truncated or overrunning input |
 | `AttestationParserTest` | a complete synthetic KeyDescription built with `DerFixture`, asserting every verdict input: header fields, RootOfTrust (locked/unlocked, boot state, boot hash, absent hash), patch levels, device identity, `attestationApplicationId`, and that `softwareEnforced` is ignored |
 | `KeyboxVerifierTest` | certificate parsing, chain anchoring and status-list lookup against **real Google attestation roots** (`patcher/src/test/resources/*.pem`): anchors to the right root, rejects an unanchored keybox, and looks a serial up by hex (the documented format) while ignoring decimal keys |
+| `PropSpoofTest` | the per-partition prop maps: every partition gets its own prefix, only `/system/build.prop` carries the unprefixed keys, vendor adds the bootimage fingerprint and `ro.adb.secure`, unusable identities produce nothing, and no map ever contains a blank value (which would erase a stock property) |
 
 Fixtures are built in-process with `DexFixture` and `DerFixture`, so the dex and DER tests depend on no ROM extraction. A fixture states a signature or a structure exactly — that is the contract being matched on. The keybox fixtures are two genuine Google attestation roots, fetched from `https://android.googleapis.com/attestation/root`.
 
@@ -235,7 +236,21 @@ The app module has no JVM unit tests: AGP needs `androidJdkImage` for `compileDe
 ./gradlew :patcher:run --args="--fetch-integrity"                           # download Google roots + status list
 ./gradlew :patcher:run --args="--verify-keybox /path/keybox.xml"            # offline keybox verification
 ./gradlew :patcher:run --args="--patch-prop build.prop --props props.json"  # apply a prop map to build.prop
+./gradlew :patcher:run --args="--dump-prop-maps out/ --props Pif-props.json" # per-partition prop maps for a PIF
 ```
+
+### Verifying a ROM without a device
+
+The three `tools/rom-audit/` scripts answer, in order: what the ROM contains, who wins each property key, and whether the spoof actually survives. `verify_props.py` drives the real patcher and the real maps against a copy of the ROM tree:
+
+```bash
+./gradlew :patcher:installDist
+patcher/build/install/patcher/bin/patcher --dump-prop-maps /tmp/maps --props Toolbox-data/Pif-props.json
+python tools/rom-audit/verify_props.py --rom /path/to/MIUI13/ROM --maps /tmp/maps \
+  --patcher patcher/build/install/patcher/bin/patcher.bat --java-home "$JAVA_HOME"
+```
+
+It exits non-zero if any identity key still resolves to a stock value. All three surya ROMs currently pass: 7 property files patched on MIUI 12 (no `system_ext`) and 8 on MIUI 13/14, with all 15 identity keys resolving to the spoofed value.
 
 On-device verification:
 
@@ -252,7 +267,7 @@ logcat -s farewelld                      # daemon/helper log lines
 - [CorePatch (signature checks)](Toolbox-docs/V2.0.3+/CorePatch.md) · [Disable FLAG_SECURE](Toolbox-docs/V2.0.3+/Disable_Secure_Flag.md)
 - [Native daemon & installer](native/rom/README.md)
 - [ROM Audit: Surya (MIUI 12/13/14)](Toolbox-docs/V2.0.3+/ROM_Audit_Surya.md) — what the stock ROMs actually contain, which rules can fire, and who wins each property key
-- ROM porting tools in `tools/rom-audit/`: `rom_audit.py` (what a ROM contains vs. what the rules need) and `prop_resolve.py` (which property file wins each key, `import` chain included)
+- ROM porting tools in `tools/rom-audit/`: `rom_audit.py` (what a ROM contains vs. what the rules need), `prop_resolve.py` (which property file wins each key, `import` chain included) and `verify_props.py` (patches a real ROM tree with the real per-partition maps and asserts the spoofed identity wins)
 - `tools/config-inspect/inspect_config.py` — decode a live `sys_keystore_cfg` blob and query it exactly the way `HookConfig` does, to confirm the per-app rules reached the framework
 - Reference smali for every patched call-site: `Toolbox-docs/Template/Template_V2060/{framework,service}/`
 

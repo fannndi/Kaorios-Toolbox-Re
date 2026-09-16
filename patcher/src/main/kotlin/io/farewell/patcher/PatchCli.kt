@@ -20,6 +20,7 @@ fun main(args: Array<String>) {
     var fetchIntegrity = false
     var patchProp: File? = null
     var propsFile: File? = null
+    var dumpPropMaps: File? = null
 
     var index = 0
     while (index < args.size) {
@@ -34,6 +35,7 @@ fun main(args: Array<String>) {
             "--fetch-integrity" -> fetchIntegrity = true
             "--patch-prop" -> patchProp = File(args[index + 1]).also { index++ }
             "--props" -> propsFile = File(args[index + 1]).also { index++ }
+            "--dump-prop-maps" -> dumpPropMaps = File(args[index + 1]).also { index++ }
             "--scan" -> scan = true
             else -> error("Unknown argument: ${args[index]}")
         }
@@ -51,6 +53,26 @@ fun main(args: Array<String>) {
         val target = output ?: File(patchProp.parentFile, patchProp.name + ".patched")
         target.writeText(result.content)
         println("Prop patch: ${result.replaced} replaced, ${result.appended} appended -> ${target.absolutePath}")
+        return
+    }
+
+    if (dumpPropMaps != null) {
+        val pifFile = propsFile?.takeIf { it.exists() }
+            ?: error("--dump-prop-maps requires --props <Pif-props.json>")
+        val identity = PropSpoof.identityFrom(org.json.JSONObject(pifFile.readText()))
+            ?: error("Could not build a spoof identity from ${pifFile.absolutePath}")
+        dumpPropMaps.mkdirs()
+        println("Spoof identity: ${identity.brand}/${identity.device} ${identity.model} (${identity.product})")
+        println("Fingerprint: ${identity.fingerprint}")
+        for (partition in PropPartition.entries) {
+            val map = PropSpoof.propMapFor(partition, identity)
+            if (map.isEmpty()) continue
+            val json = org.json.JSONObject()
+            for ((key, value) in map) json.put(key, value)
+            val target = File(dumpPropMaps, "${partition.name}.json")
+            target.writeText(json.toString(2))
+            println("  ${partition.name.padEnd(11)} ${map.size} keys -> ${target.absolutePath}")
+        }
         return
     }
 
