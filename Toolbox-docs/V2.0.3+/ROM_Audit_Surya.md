@@ -84,6 +84,30 @@ Consequences for the patch:
    the source order, because a reader may ask for either the plain or a prefixed key
    (DroidGuard asks for both). This is what `PlayIntegritySetup.propMapFor()` does.
 
+### How init actually finds these files
+
+Verified against the stock `init` binary rather than assumed from AOSP. The binary
+contains the literal templates `/build.prop`, `/default.prop` and `/etc/build.prop`,
+plus the error string `Could not expand import: `. So init:
+
+- loads, for each partition it knows about, `<mount_point>/build.prop`,
+  `<mount_point>/default.prop` and `<mount_point>/etc/build.prop` — one set of templates
+  explains why Android 10 keeps product props at `/product/build.prop` while Android 11+
+  moved them to `/product/etc/build.prop`;
+- processes `import <path>` **inline**, with `${property}` substitution (the
+  `Could not expand import:` string is init's own failure path for that expansion);
+- does **not** have a top-level `/odm` on surya. There is no `odm` entry in
+  `vendor/etc/fstab.default` and no `odm/` directory in the dump — the odm partition is
+  mounted at `/vendor/odm`, which is why the odm properties live at
+  `/vendor/odm/etc/build.prop`. (`system/etc/ueventd.rc` imports `/odm/etc/ueventd.rc`,
+  and `libcutils.so` carries the relative list `odm/build.prop`, `odm/etc/build.prop`,
+  `product/build.prop`, `system/build.prop`, `system_ext/build.prop`, `vendor/build.prop`.)
+
+The practical upshot: the odm file **is** read, and its `import` **is** processed in
+place — which is what makes the next section matter.
+
+`prop_resolve.py` models exactly this and reports who wins each key; see §9.
+
 ---
 
 ## 3. The per-SKU import trap
@@ -142,6 +166,43 @@ All three ROMs ship all four SKU files, so the fix applies uniformly:
 
 No installer change was needed: `installer.sh` derives the partitions to mount and back
 up from the manifest paths (`cut -d/ -f1`), so `vendor/...` targets are handled already.
+
+### Proof, using the real `PropPatcher`
+
+`tools/rom-audit/prop_resolve.py` expands `import` directives in load order and reports
+who wins each key. Against stock MIUI 13 it shows the SKU file winning outright:
+
+```text
+TRACE ro.product.odm.model
+  vendor/odm/etc/build.prop:20                   M2007J20CG
+  vendor/odm/etc/build_surya.prop:7              M2007J20CG  <- WINNER
+```
+
+Then, applying the ODM partition map with the real `PropPatcher` (via
+`patcher --patch-prop`):
+
+**Before the fix — patch `vendor/odm/etc/build.prop` only.** The patcher reports
+`11 replaced, 1 appended`, and the file really does change:
+
+```text
+TRACE ro.product.odm.model
+  vendor/odm/etc/build.prop:20                   Pixel 8 Pro
+  vendor/odm/etc/build_surya.prop:7              M2007J20CG  <- WINNER
+```
+
+Final value: **M2007J20CG**. The patch succeeded and the device is still a POCO X3.
+
+**After the fix — also patch `vendor/odm/etc/build_surya.prop`:**
+
+```text
+TRACE ro.product.odm.model
+  vendor/odm/etc/build.prop:20                   Pixel 8 Pro
+  vendor/odm/etc/build_surya.prop:7              Pixel 8 Pro  <- WINNER
+```
+
+Final value: **Pixel 8 Pro**, with both writers agreeing, so the result no longer depends
+on which one init happens to apply last. `ro.odm.build.fingerprint`,
+`ro.product.odm.brand` and `ro.product.odm.device` resolve the same way.
 
 ---
 
@@ -217,7 +278,51 @@ different API level, which is expected.
 
 ---
 
-## 6. Rules that were wrong, and what changed
+## 6. End-to-end verification
+
+Knowing a signature exists is not the same as knowing the patch applies. The patcher CLI
+was therefore run against all six stock jars:
+
+```bash
+patcher/build/install/patcher/bin/patcher \
+  --input <stock framework.jar|services.jar> \
+  --output out.jar --kind framework|services \
+  --profile surya-miui12|surya-miui13|surya-miui14 \
+  --hook build/hook/hook.dex
+```
+
+Result: **0 skipped, 0 engine errors** on every jar.
+
+| ROM | Jar | Rules applied | Dex files | Classes before → after |
+|---|---|---|---|---|
+| MIUI 12 | framework | 14 | 5 (2 with hook calls) | 19,197 → 19,216 |
+| MIUI 12 | services | 6 | 3 (2 with hook calls) | 7,368 → 7,387 |
+| MIUI 13 | framework | 15 | 5 (2 with hook calls) | 23,675 → 23,694 |
+| MIUI 13 | services | 6 | 3 (2 with hook calls) | 10,934 → 10,953 |
+| MIUI 14 | framework | 15 | 5 (2 with hook calls) | 23,682 → 23,701 |
+| MIUI 14 | services | 6 | 3 (2 with hook calls) | 10,937 → 10,956 |
+
+Every jar gained **exactly +19 classes** — the hook's own class count — so no original
+class was lost or duplicated by the dexlib2 rewrite.
+
+Which rules fire per ROM matches the `apiRange` table in §5 exactly, which is the real
+point of the exercise:
+
+- MIUI 12 uses the **legacy** keystore path (`android/security/keystore/*`); MIUI 13/14
+  use **keystore2**. Never both.
+- `corepatch.apksignatureverifier.minimumscheme` fires on MIUI 13/14 only — correct, it is
+  gated to API 31+ and MIUI 12 is API 29.
+- `legacy.appsfilter.shouldFilterApplication` fires on MIUI 13/14 only — correct, `AppsFilter`
+  is A11/12 and the gate is `30..32`.
+- `legacy.wm.isSecureLocked` and `legacy.devicepolicy.getScreenCaptureDisabled` fire on
+  MIUI 12 only — correct, both are gated `0..30`.
+- `WindowManagerCapture` never fires anywhere — correct, the method is inlined away.
+- `corepatch.strictjarverifier.verifydigest` fires on **all three** — confirming the rule was
+  never dead (see §7).
+
+---
+
+## 7. Rules that were wrong, and what changed
 
 ### `SettingsProviderRule` — removed
 
@@ -266,7 +371,7 @@ coverage they never had. Each now carries the range the audit supports:
 
 ---
 
-## 7. Known residuals
+## 8. Known residuals
 
 These are deliberate, documented gaps rather than bugs.
 
@@ -285,15 +390,44 @@ These are deliberate, documented gaps rather than bugs.
 
 ---
 
-## 8. Reproducing this audit
+## 9. Reproducing this audit
+
+Two scripts, because the question has two halves — what is in the ROM, and who wins.
+
+**`rom_audit.py` — what the ROM contains.** Dumps `framework.jar`, `services.jar` and
+`SettingsProvider.apk` with `dexdump`, compares every rule target honouring its
+`apiRange`, and lists the property-file layout.
 
 ```bash
-# full report for three ROMs
 python tools/rom-audit/rom_audit.py \
   --rom MIUI12=C:/Users/.../MIUI12/ROM \
   --rom MIUI13=C:/Users/.../MIUI13/ROM \
   --rom MIUI14=C:/Users/.../MIUI14/ROM \
   --json tools/rom-audit/last-audit.json
+```
+
+**`prop_resolve.py` — who wins each key.** Expands `import` directives in load order and
+reports the winning value and file for each key, with `--trace` to list every writer and
+`--patch FILE=JSON` to apply a map first.
+
+```bash
+# who currently wins the identity keys?
+python tools/rom-audit/prop_resolve.py --rom /path/to/MIUI13/ROM --sku surya
+
+# prove a patch end to end
+python tools/rom-audit/prop_resolve.py --rom /path/to/MIUI13/ROM --sku surya \
+  --patch vendor/odm/etc/build.prop=odm.json \
+  --patch vendor/odm/etc/build_surya.prop=odm.json \
+  --trace ro.product.odm.model
+```
+
+And to validate the dex side end to end:
+
+```bash
+./gradlew :patcher:installDist
+patcher/build/install/patcher/bin/patcher \
+  --input <stock jar> --output out.jar --kind framework \
+  --profile surya-miui13 --hook build/hook/hook.dex
 ```
 
 Both extraction layouts are handled automatically:
@@ -305,5 +439,5 @@ When porting to a new device, the three things to check first are:
 
 1. `ro.product.property_source_order` — which partition wins the identity keys.
 2. Whether `build.prop` ends with a per-SKU `import` — if so, the SKU file must be
-   patched too.
+   patched too, and `prop_resolve.py --trace` will show it winning.
 3. The `no-class` / `no-method` rows for rules whose `apiRange` covers the target API.

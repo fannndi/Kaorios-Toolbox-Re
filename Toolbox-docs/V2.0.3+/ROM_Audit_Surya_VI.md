@@ -85,6 +85,31 @@ Hệ quả với bản patch:
    có thể hỏi key trần hoặc key có tiền tố (DroidGuard hỏi cả hai). Đây chính là việc
    `PlayIntegritySetup.propMapFor()` làm.
 
+### init thực sự tìm các file này như thế nào
+
+Được kiểm chứng trên chính binary `init` của ROM stock, không suy đoán từ AOSP. Binary
+này chứa các template dạng chuỗi `/build.prop`, `/default.prop` và `/etc/build.prop`,
+cùng thông báo lỗi `Could not expand import: `. Vì vậy init:
+
+- nạp, cho mỗi phân vùng mà nó biết, `<mount_point>/build.prop`,
+  `<mount_point>/default.prop` và `<mount_point>/etc/build.prop` — chỉ một bộ template
+  cũng đủ giải thích vì sao Android 10 giữ prop của product ở `/product/build.prop`
+  trong khi Android 11+ chuyển sang `/product/etc/build.prop`;
+- xử lý `import <path>` **tại chỗ**, có thay thế `${property}` (chuỗi
+  `Could not expand import:` chính là nhánh lỗi của init cho việc thay thế đó);
+- **không** có `/odm` ở cấp cao nhất trên surya. Không có mục `odm` nào trong
+  `vendor/etc/fstab.default` và không có thư mục `odm/` trong bản dump — phân vùng odm
+  được mount tại `/vendor/odm`, đó là lý do prop của odm nằm ở
+  `/vendor/odm/etc/build.prop`. (`system/etc/ueventd.rc` import `/odm/etc/ueventd.rc`,
+  và `libcutils.so` mang danh sách đường dẫn tương đối `odm/build.prop`,
+  `odm/etc/build.prop`, `product/build.prop`, `system/build.prop`,
+  `system_ext/build.prop`, `vendor/build.prop`.)
+
+Điểm cốt lõi: file odm **có** được đọc, và `import` của nó **có** được xử lý tại chỗ —
+chính điều này làm cho phần tiếp theo trở nên quan trọng.
+
+`prop_resolve.py` mô hình hoá đúng cơ chế này và cho biết key nào thắng; xem §9.
+
 ---
 
 ## 3. Cái bẫy import theo SKU
@@ -143,6 +168,42 @@ Cả ba ROM đều có đủ bốn file SKU, nên cách sửa áp dụng đồng
 
 Không cần sửa installer: `installer.sh` suy ra phân vùng cần mount và backup từ đường
 dẫn trong manifest (`cut -d/ -f1`), nên mục tiêu `vendor/...` đã được xử lý sẵn.
+
+### Chứng minh, bằng chính `PropPatcher` thật
+
+`tools/rom-audit/prop_resolve.py` mở rộng các chỉ thị `import` theo thứ tự nạp và cho
+biết key nào thắng. Trên MIUI 13 stock, nó cho thấy file SKU thắng hoàn toàn:
+
+```text
+TRACE ro.product.odm.model
+  vendor/odm/etc/build.prop:20                   M2007J20CG
+  vendor/odm/etc/build_surya.prop:7              M2007J20CG  <- WINNER
+```
+
+Sau đó, áp map của phân vùng ODM bằng `PropPatcher` thật (qua `patcher --patch-prop`):
+
+**Trước khi sửa — chỉ patch `vendor/odm/etc/build.prop`.** Patcher báo
+`11 replaced, 1 appended`, và file thực sự đã đổi:
+
+```text
+TRACE ro.product.odm.model
+  vendor/odm/etc/build.prop:20                   Pixel 8 Pro
+  vendor/odm/etc/build_surya.prop:7              M2007J20CG  <- WINNER
+```
+
+Giá trị cuối cùng: **M2007J20CG**. Patch thành công mà thiết bị vẫn là POCO X3.
+
+**Sau khi sửa — patch thêm `vendor/odm/etc/build_surya.prop`:**
+
+```text
+TRACE ro.product.odm.model
+  vendor/odm/etc/build.prop:20                   Pixel 8 Pro
+  vendor/odm/etc/build_surya.prop:7              Pixel 8 Pro  <- WINNER
+```
+
+Giá trị cuối cùng: **Pixel 8 Pro**, và cả hai bên ghi đều khớp nhau, nên kết quả không
+còn phụ thuộc vào việc init áp cái nào sau cùng. `ro.odm.build.fingerprint`,
+`ro.product.odm.brand` và `ro.product.odm.device` cũng hội tụ theo cùng cách.
 
 ---
 
@@ -219,7 +280,51 @@ Ghi chú:
 
 ---
 
-## 6. Những rule sai, và đã thay đổi gì
+## 6. Kiểm chứng đầu-cuối
+
+Biết một chữ ký tồn tại không đồng nghĩa với biết bản patch áp được. Vì vậy CLI của
+patcher đã được chạy trên cả sáu jar stock:
+
+```bash
+patcher/build/install/patcher/bin/patcher \
+  --input <framework.jar|services.jar stock> \
+  --output out.jar --kind framework|services \
+  --profile surya-miui12|surya-miui13|surya-miui14 \
+  --hook build/hook/hook.dex
+```
+
+Kết quả: **0 bỏ qua, 0 lỗi engine** trên mọi jar.
+
+| ROM | Jar | Rule đã áp | File dex | Class trước → sau |
+|---|---|---|---|---|
+| MIUI 12 | framework | 14 | 5 (2 có lời gọi hook) | 19.197 → 19.216 |
+| MIUI 12 | services | 6 | 3 (2 có lời gọi hook) | 7.368 → 7.387 |
+| MIUI 13 | framework | 15 | 5 (2 có lời gọi hook) | 23.675 → 23.694 |
+| MIUI 13 | services | 6 | 3 (2 có lời gọi hook) | 10.934 → 10.953 |
+| MIUI 14 | framework | 15 | 5 (2 có lời gọi hook) | 23.682 → 23.701 |
+| MIUI 14 | services | 6 | 3 (2 có lời gọi hook) | 10.937 → 10.956 |
+
+Mọi jar tăng **đúng +19 class** — đúng bằng số class của chính hook — nên không có class
+gốc nào bị mất hay bị nhân đôi bởi quá trình ghi lại dex của dexlib2.
+
+Việc rule nào chạy trên ROM nào khớp chính xác với bảng `apiRange` ở §5, và đó mới là
+điểm thực sự của bài kiểm tra:
+
+- MIUI 12 dùng đường keystore **legacy** (`android/security/keystore/*`); MIUI 13/14 dùng
+  **keystore2**. Không bao giờ chạy cả hai.
+- `corepatch.apksignatureverifier.minimumscheme` chỉ chạy trên MIUI 13/14 — đúng, nó bị
+  giới hạn ở API 31+ còn MIUI 12 là API 29.
+- `legacy.appsfilter.shouldFilterApplication` chỉ chạy trên MIUI 13/14 — đúng, `AppsFilter`
+  là A11/12 và giới hạn là `30..32`.
+- `legacy.wm.isSecureLocked` và `legacy.devicepolicy.getScreenCaptureDisabled` chỉ chạy
+  trên MIUI 12 — đúng, cả hai đều bị giới hạn `0..30`.
+- `WindowManagerCapture` không bao giờ chạy — đúng, method đã bị inline mất.
+- `corepatch.strictjarverifier.verifydigest` chạy trên **cả ba** — xác nhận rule này chưa
+  bao giờ chết (xem §7).
+
+---
+
+## 7. Những rule sai, và đã thay đổi gì
 
 ### `SettingsProviderRule` — đã xoá
 
@@ -268,7 +373,7 @@ bao phủ mà chúng chưa từng có. Mỗi rule giờ mang khoảng mà kiểm
 
 ---
 
-## 7. Những tồn dư đã biết
+## 8. Những tồn dư đã biết
 
 Đây là các khoảng trống có chủ đích và đã được ghi lại, không phải bug.
 
@@ -287,15 +392,44 @@ bao phủ mà chúng chưa từng có. Mỗi rule giờ mang khoảng mà kiểm
 
 ---
 
-## 8. Tái lập kiểm toán này
+## 9. Tái lập kiểm toán này
+
+Hai script, vì câu hỏi có hai nửa — ROM chứa gì, và ai thắng.
+
+**`rom_audit.py` — ROM chứa gì.** Dump `framework.jar`, `services.jar` và
+`SettingsProvider.apk` bằng `dexdump`, đối chiếu mọi mục tiêu rule có tôn trọng
+`apiRange`, và liệt kê bố cục file property.
 
 ```bash
-# báo cáo đầy đủ cho ba ROM
 python tools/rom-audit/rom_audit.py \
   --rom MIUI12=C:/Users/.../MIUI12/ROM \
   --rom MIUI13=C:/Users/.../MIUI13/ROM \
   --rom MIUI14=C:/Users/.../MIUI14/ROM \
   --json tools/rom-audit/last-audit.json
+```
+
+**`prop_resolve.py` — ai thắng từng key.** Mở rộng các chỉ thị `import` theo thứ tự nạp
+và báo cáo giá trị cùng file thắng cho mỗi key, với `--trace` để liệt kê mọi bên ghi và
+`--patch FILE=JSON` để áp một map trước.
+
+```bash
+# hiện tại key danh tính do ai thắng?
+python tools/rom-audit/prop_resolve.py --rom /path/to/MIUI13/ROM --sku surya
+
+# chứng minh một bản patch đầu-cuối
+python tools/rom-audit/prop_resolve.py --rom /path/to/MIUI13/ROM --sku surya \
+  --patch vendor/odm/etc/build.prop=odm.json \
+  --patch vendor/odm/etc/build_surya.prop=odm.json \
+  --trace ro.product.odm.model
+```
+
+Và để kiểm chứng phía dex đầu-cuối:
+
+```bash
+./gradlew :patcher:installDist
+patcher/build/install/patcher/bin/patcher \
+  --input <jar stock> --output out.jar --kind framework \
+  --profile surya-miui13 --hook build/hook/hook.dex
 ```
 
 Cả hai kiểu giải nén đều được xử lý tự động:
@@ -307,5 +441,5 @@ Khi port sang thiết bị mới, ba thứ cần kiểm tra trước tiên là:
 
 1. `ro.product.property_source_order` — phân vùng nào thắng các key danh tính.
 2. `build.prop` có kết thúc bằng `import` theo SKU hay không — nếu có thì file SKU cũng
-   phải được patch.
+   phải được patch, và `prop_resolve.py --trace` sẽ cho thấy nó đang thắng.
 3. Các dòng `no-class` / `no-method` của những rule có `apiRange` bao phủ mức API đích.

@@ -230,6 +230,7 @@ logcat -s farewelld                      # daemon/helper log lines
 - [CorePatch (signature checks)](Toolbox-docs/V2.0.3+/CorePatch.md) · [Disable FLAG_SECURE](Toolbox-docs/V2.0.3+/Disable_Secure_Flag.md) · [Android 17 notes](Toolbox-docs/V2.0.3+/notes-a17.md)
 - [Native daemon & installer](native/rom/README.md)
 - [ROM Audit: Surya (MIUI 12/13/14)](Toolbox-docs/V2.0.3+/ROM_Audit_Surya.md) · [Tiếng Việt](Toolbox-docs/V2.0.3+/ROM_Audit_Surya_VI.md) — what the stock ROMs actually contain, and which rules can fire
+- ROM porting tools in `tools/rom-audit/`: `rom_audit.py` (what a ROM contains vs. what the rules need) and `prop_resolve.py` (which property file wins each key, `import` chain included)
 - Reference smali for every patched call-site: `Toolbox-docs/Template/Template_V2060/{framework,service}/`
 
 **Advanced features** (per-app setting spoof) are implemented **client-side** on `Settings$NameValueCache.getStringForUser`, which exists on all three surya ROMs and covers both app and `system_server` reads. There is deliberately **no** server-side `SettingsProvider` hook: the provider lives in `/system/priv-app/SettingsProvider/SettingsProvider.apk` (not `services.jar`) and exposes neither `getStringForUser` nor `getString` on surya MIUI 12/13/14. Installing only the APK or loading only the DEX is not enough — the framework patch carries the hook. See [ROM Audit: Surya](Toolbox-docs/V2.0.3+/ROM_Audit_Surya.md).
