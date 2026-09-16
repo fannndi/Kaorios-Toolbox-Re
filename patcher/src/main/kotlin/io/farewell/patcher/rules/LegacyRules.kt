@@ -56,7 +56,12 @@ class SettingsNameValueCacheRule : MethodRule {
 
 class LegacyAppsFilterRule : MethodRule {
     override val name = "legacy.appsfilter.shouldFilterApplication"
-    override val apiRange: IntRange = 0..32
+
+    // com.android.server.pm.AppsFilter appears in Android 11 and is replaced by
+    // AppsFilterBase/AppsFilterImpl in Android 13. Android 10 has no AppsFilter
+    // class at all — there the filter path is PackageManagerService.filterAppAccess*
+    // (see FilterAppAccessRule).
+    override val apiRange: IntRange = 30..32
     override fun enabledFor(kind: JarKind) = kind == JarKind.SERVICES
 
     override fun applyMethod(classDef: ClassDef, method: Method, impl: MutableMethodImplementation): Boolean {
@@ -127,7 +132,11 @@ class LegacyScreenCaptureRule : MethodRule {
 
 class LegacyWindowManagerSecureRule : MethodRule {
     override val name = "legacy.wm.isSecureLocked"
-    override val apiRange: IntRange = 0..32
+
+    // WindowManagerService.isSecureLocked(WindowState) exists on Android 10 only.
+    // From Android 11 the same check moved to WindowState.isSecureLocked()
+    // (see WindowSecureRule).
+    override val apiRange: IntRange = 0..30
     override fun enabledFor(kind: JarKind) = kind == JarKind.SERVICES
 
     override fun applyMethod(classDef: ClassDef, method: Method, impl: MutableMethodImplementation): Boolean {

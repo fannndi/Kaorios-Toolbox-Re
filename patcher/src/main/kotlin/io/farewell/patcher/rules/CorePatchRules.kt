@@ -57,6 +57,11 @@ class MessageDigestForceRule : MethodRule {
 
 class MinimumSignatureSchemeRule : MethodRule {
     override val name = "corepatch.apksignatureverifier.minimumscheme"
+
+    // ApkSignatureVerifier.getMinimumSignatureSchemeVersionForTargetSdk was added
+    // in Android 11. It is absent on surya MIUI 12 (Android 10), where signature
+    // weakening relies on SigningDetails / StrictJarVerifier instead.
+    override val apiRange: IntRange = 31..Int.MAX_VALUE
     override fun enabledFor(kind: JarKind) = kind == JarKind.FRAMEWORK || kind == JarKind.SERVICES
 
     override fun applyMethod(classDef: ClassDef, method: Method, impl: MutableMethodImplementation): Boolean {

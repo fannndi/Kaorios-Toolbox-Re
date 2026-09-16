@@ -19,7 +19,6 @@ import io.farewell.patcher.rules.PackageManagerInstallerRule
 import io.farewell.patcher.rules.MessageDigestForceRule
 import io.farewell.patcher.rules.MethodRule
 import io.farewell.patcher.rules.MinimumSignatureSchemeRule
-import io.farewell.patcher.rules.SettingsProviderRule
 import io.farewell.patcher.rules.SigningDetailsRule
 import io.farewell.patcher.rules.StrictJarVerifierRule
 import io.farewell.patcher.rules.SystemPropertiesPrimitiveRule
@@ -75,7 +74,6 @@ class DexPatchEngine(
         InstallerSourceRule(),
         PackageManagerInstallerRule(),
         FilterAppAccessRule(),
-        SettingsProviderRule(),
         DevicePolicySecureRule(),
         LegacyScreenCaptureRule(),
         WindowSecureRule(),

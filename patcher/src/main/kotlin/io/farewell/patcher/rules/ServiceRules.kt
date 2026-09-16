@@ -2,15 +2,11 @@ package io.farewell.patcher.rules
 
 import io.farewell.patcher.HookContract
 import io.farewell.patcher.JarKind
-import com.android.tools.smali.dexlib2.Opcode
 import com.android.tools.smali.dexlib2.builder.BuilderInstruction
 import com.android.tools.smali.dexlib2.builder.MutableMethodImplementation
-import com.android.tools.smali.dexlib2.builder.instruction.BuilderInstruction35c
 import com.android.tools.smali.dexlib2.iface.ClassDef
 import com.android.tools.smali.dexlib2.iface.Method
 import com.android.tools.smali.dexlib2.iface.instruction.OneRegisterInstruction
-import com.android.tools.smali.dexlib2.iface.instruction.ReferenceInstruction
-import com.android.tools.smali.dexlib2.iface.reference.StringReference
 
 class SystemServerInitRule : MethodRule {
     override val name = "services.systemserver.init"
@@ -40,6 +36,11 @@ class SystemServerInitRule : MethodRule {
 
 class AppsFilterRule : MethodRule {
     override val name = "services.appsfilter.shouldFilterApplication"
+
+    // AppsFilterBase / AppsFilterImpl only exist from Android 13 (SDK 33). On
+    // Android 11/12 the same hook lives on com.android.server.pm.AppsFilter
+    // (see LegacyAppsFilterRule); on Android 10 there is no AppsFilter at all.
+    override val apiRange: IntRange = 33..Int.MAX_VALUE
     override fun enabledFor(kind: JarKind) = kind == JarKind.SERVICES
 
     override fun applyMethod(classDef: ClassDef, method: Method, impl: MutableMethodImplementation): Boolean {
@@ -86,6 +87,11 @@ class AppsFilterRule : MethodRule {
 
 class InstallerSourceRule : MethodRule {
     override val name = "services.computerengine.installer"
+
+    // ComputerEngine only carries getInstallerPackageName from Android 13 (SDK 33).
+    // On surya MIUI 12/13/14 the method is declared on PackageManagerService itself
+    // (see PackageManagerInstallerRule), so this rule stays dormant there.
+    override val apiRange: IntRange = 33..Int.MAX_VALUE
     override fun enabledFor(kind: JarKind) = kind == JarKind.SERVICES
 
     override fun applyMethod(classDef: ClassDef, method: Method, impl: MutableMethodImplementation): Boolean {
@@ -107,51 +113,37 @@ class InstallerSourceRule : MethodRule {
     }
 }
 
-class SettingsProviderRule : MethodRule {
-    override val name = "services.settingsprovider.values"
-    override fun enabledFor(kind: JarKind) = kind == JarKind.SERVICES
-
-    private val tables = setOf("global", "secure", "system")
-
-    override fun applyMethod(classDef: ClassDef, method: Method, impl: MutableMethodImplementation): Boolean {
-        if (!classDef.type.endsWith("SettingsProvider;")) return false
-        if (method.name != "getStringForUser" && method.name != "getString") return false
-        if (method.returnType != HookContract.STRING) return false
-        val params = method.parameterTypesList()
-        val nameIndex = params.indexOfFirst { it == HookContract.STRING }
-        if (nameIndex < 0) return false
-
-        var tableRegister = -1
-        for (instruction in impl.instructions) {
-            if (instruction.opcode != Opcode.CONST_STRING) continue
-            val reference = (instruction as? ReferenceInstruction)?.reference as? StringReference ?: continue
-            if (reference.string in tables) {
-                tableRegister = (instruction as OneRegisterInstruction).registerA
-                break
-            }
-        }
-        if (tableRegister < 0) return false
-        val nameRegister = method.parameterRegister(nameIndex)
-        if (nameRegister < 0) return false
-
-        val reference = Asm.methodRef(
-            HOOK_CLASS, HookContract.FILTER_SETTING_VALUE,
-            listOf(HookContract.STRING, HookContract.STRING, HookContract.STRING), HookContract.STRING
-        )
-        var patched = false
-        impl.replaceReturnsObject { register ->
-            patched = true
-            listOf(
-                Asm.invokeStatic(intArrayOf(tableRegister, nameRegister, register), reference),
-                Asm.moveResultObject(register)
-            )
-        }
-        return patched
-    }
-}
+/*
+ * There is deliberately no SettingsProvider rule here.
+ *
+ * The 2.0.6.0 patch guide documents a server-side `filterSettingValue` /
+ * `shouldRemoveSetting` patch on the SettingsProvider GET path, and the previous
+ * implementation tried to match it inside services.jar. That could never work:
+ *
+ *  - `com.android.providers.settings.SettingsProvider` lives in
+ *    /system/priv-app/SettingsProvider/SettingsProvider.apk, not in services.jar.
+ *  - The provider has no `getStringForUser` and no `getString` method on surya
+ *    MIUI 12, 13 or 14 (verified against the stock APK dex).
+ *  - The only String-returning server-side entry point is
+ *    `getSettingValue(Landroid/os/Bundle;)Ljava/lang/String;`, which is a
+ *    one-liner (`request.getString("value")`) and carries no table name, so a
+ *    per-app filter cannot be built on it.
+ *
+ * Per-app Settings spoofing is therefore implemented client-side on
+ * `Settings$NameValueCache.getStringForUser`, which exists on all three ROMs and
+ * covers both app and system_server reads (see HideDevStatusRule and
+ * SettingsNameValueCacheRule). A true server-side variant would have to
+ * post-process the Bundle returned by `SettingsProvider.call(String, String,
+ * Bundle)` and would require patching the priv-app APK, which replaces a signed
+ * system app with an unsigned one. See Toolbox-docs/V2.0.3+/ROM_Audit_Surya.md.
+ */
 
 class DevicePolicySecureRule : MethodRule {
     override val name = "services.devicepolicy.screencapture"
+
+    // Android 11+ exposes isScreenCaptureAllowed(int, boolean). Android 10 uses
+    // the inverted getScreenCaptureDisabled(int) (see LegacyScreenCaptureRule).
+    override val apiRange: IntRange = 31..Int.MAX_VALUE
     override fun enabledFor(kind: JarKind) = kind == JarKind.SERVICES
 
     override fun applyMethod(classDef: ClassDef, method: Method, impl: MutableMethodImplementation): Boolean {
@@ -231,6 +223,14 @@ class WindowSecureRule : MethodRule {
 
 class WindowManagerCaptureRule : MethodRule {
     override val name = "services.wm.captureDisplay"
+
+    // WindowManagerService.notAllowCaptureDisplay does not exist on surya MIUI 12,
+    // 13 or 14 — the stock services.jar is R8-processed and the method is inlined
+    // away. FLAG_SECURE is covered there by WindowState.isSecureLocked,
+    // WindowStateAnimator.setSecureLocked and the DevicePolicyCache rules. This
+    // rule is kept for the generic Android 13+ profile, where the method is still
+    // present upstream.
+    override val apiRange: IntRange = 33..Int.MAX_VALUE
     override fun enabledFor(kind: JarKind) = kind == JarKind.SERVICES
 
     override fun applyMethod(classDef: ClassDef, method: Method, impl: MutableMethodImplementation): Boolean {
