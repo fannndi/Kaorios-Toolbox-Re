@@ -13,6 +13,7 @@ import io.farewell.toolbox.core.PatchRepository
 import io.farewell.toolbox.core.PlayIntegrityFlags
 import io.farewell.toolbox.core.PlayIntegritySetup
 import io.farewell.toolbox.core.RootShell
+import io.farewell.toolbox.core.SpoofRules
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -37,7 +38,9 @@ data class PatchUiState(
     val autoRefresh: Boolean = false,
     val autoRefreshLast: String = "",
     val integrationMessage: String = "",
-    val nativeStatus: String = ""
+    val nativeStatus: String = "",
+    val rules: SpoofRules = SpoofRules(),
+    val rulesMessage: String = ""
 )
 
 class MainViewModel(application: Application) : AndroidViewModel(application) {
@@ -52,10 +55,41 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             keyboxImported = PlayIntegritySetup.keyboxImported(application),
             keyboxCount = PlayIntegritySetup.keyboxFiles(application).size,
             autoRefresh = AutoRefresh.isEnabled(application),
-            autoRefreshLast = AutoRefresh.lastResult(application)
+            autoRefreshLast = AutoRefresh.lastResult(application),
+            rules = SpoofRules.load(application)
         )
     )
     val state: StateFlow<PatchUiState> = _state
+
+    /**
+     * Every per-app rule edit is persisted immediately and then needs an
+     * "Apply Play Integrity setup" run to reach the hook config in
+     * `Settings.Global`.
+     */
+    fun updateRules(transform: (SpoofRules) -> SpoofRules) {
+        val updated = transform(_state.value.rules)
+        val saved = SpoofRules.save(getApplication(), updated)
+        _state.update {
+            it.copy(
+                rules = updated,
+                rulesMessage = if (saved) {
+                    "Saved. Press \"Apply Play Integrity setup\" to write it to the device."
+                } else {
+                    "Could not save rules"
+                }
+            )
+        }
+    }
+
+    fun clearRules() {
+        val saved = SpoofRules.save(getApplication(), SpoofRules())
+        _state.update {
+            it.copy(
+                rules = SpoofRules(),
+                rulesMessage = if (saved) "All per-app rules cleared" else "Could not save rules"
+            )
+        }
+    }
 
     init {
         refreshStatus()
@@ -161,6 +195,11 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                     busy = false,
                     progress = "",
                     integrationMessage = result.message,
+                    rulesMessage = if (result.ok) {
+                        "Rules written to the device. Restart the target app to pick them up."
+                    } else {
+                        it.rulesMessage
+                    },
                     log = it.log + result.message
                 )
             }

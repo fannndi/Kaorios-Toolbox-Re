@@ -234,19 +234,21 @@ logcat -s farewelld                      # daemon/helper log lines
 - [Native daemon & installer](native/rom/README.md)
 - [ROM Audit: Surya (MIUI 12/13/14)](Toolbox-docs/V2.0.3+/ROM_Audit_Surya.md) — what the stock ROMs actually contain, which rules can fire, and who wins each property key
 - ROM porting tools in `tools/rom-audit/`: `rom_audit.py` (what a ROM contains vs. what the rules need) and `prop_resolve.py` (which property file wins each key, `import` chain included)
+- `tools/config-inspect/inspect_config.py` — decode a live `sys_keystore_cfg` blob and query it exactly the way `HookConfig` does, to confirm the per-app rules reached the framework
 - Reference smali for every patched call-site: `Toolbox-docs/Template/Template_V2060/{framework,service}/`
 
 **Advanced features** (per-app setting spoof) are implemented **client-side** on `Settings$NameValueCache.getStringForUser`, which exists on all three surya ROMs and covers both app and `system_server` reads. There is deliberately **no** server-side `SettingsProvider` hook: the provider lives in `/system/priv-app/SettingsProvider/SettingsProvider.apk` (not `services.jar`) and exposes neither `getStringForUser` nor `getString` on surya MIUI 12/13/14. Installing only the APK or loading only the DEX is not enough — the framework patch carries the hook. See [ROM Audit: Surya](Toolbox-docs/V2.0.3+/ROM_Audit_Surya.md).
+
+The **Rules** tab is where those per-app rules are authored. It writes all four sections the hook reads — `installer`, `settings`, `remove` and `features` — persists them to `filesDir/spoof-rules.json`, and hands them to the hook the next time **Apply Play Integrity setup** runs. The exact JSON shape is documented in the [patch guide](Toolbox-docs/V2.0.3+/Patch_Guide_2.0.6.0.md).
 
 ## ✨ Features
 
 - ✅ Play Integrity fix (up to STRONG with a verified keybox).
 - 🧩 Pixel & properties spoofing (Java + native layer).
-- ⚙️ Per-app spoofing manager.
 - 🙈 Hide installed app list (caller-aware isolation).
 - 🛠️ Hide Developer Options & ADB status.
 - 🔓 Disable FLAG_SECURE (screenshots & screen recording in restricted apps).
-- ⚙️ Spoof setting values per app (Advanced; framework patch required).
+- ⚙️ Per-app spoof rules: Settings value overrides, hidden keys, forced system features and installer-source spoof (framework patch required).
 - 🧾 Keybox verification against Google's own root/revocation lists.
 - 🧯 Flash-time backup + one-flash stock restore zip.
 
@@ -254,8 +256,8 @@ logcat -s farewelld                      # daemon/helper log lines
 
 - [ ] ⚡ **Automated Patcher Tool 2.0.6+**
 - [x] ⚙️ **ROM validation for Fake & Filter System Settings** — done for surya MIUI 12/13/14. The documented server-side `filterSettingValue` / `shouldRemoveSetting` patches were audited and **removed**: the class they targeted is not reachable and has no such methods. Per-app Settings spoofing is client-side only. See [ROM Audit: Surya](Toolbox-docs/V2.0.3+/ROM_Audit_Surya.md) and re-run `tools/rom-audit/rom_audit.py` for any new ROM.
-- [ ] 📦 **Spoof Installer Source Package**: the hook side is done (`FILTER_INSTALLER` is reached by `PackageManagerInstallerRule` on all three ROMs), but the app does not yet write the `installer` section of `sys_keystore_cfg`, so the feature is inert. Needs a config writer + UI.
-- [ ] 🧩 **Per-app spoofing manager**: same gap — the hook reads `settings` / `remove` / `installer`, the app never writes them.
+- [x] 📦 **Spoof Installer Source Package** — `PackageManagerInstallerRule` patches `PackageManagerService.getInstallerPackageName` on all three ROMs, and the app now writes the `installer` section of `sys_keystore_cfg` from the **Rules** tab.
+- [x] 🧩 **Per-app spoofing manager** — the **Rules** tab writes all four sections the hook reads: `installer`, `settings` (per app / table / key), `remove` (hidden keys) and `features` (forced `hasSystemFeature`). Rules persist to `filesDir/spoof-rules.json` and reach the hook on the next **Apply Play Integrity setup**.
 
 ## 🌍 Localization & Translations
 

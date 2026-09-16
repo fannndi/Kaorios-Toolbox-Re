@@ -2,6 +2,7 @@ package io.farewell.toolbox.ui
 
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Settings
@@ -21,6 +22,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 
 private enum class FarewellTab {
     PATCH,
+    RULES,
     DATA,
     SETTINGS
 }
@@ -40,6 +42,12 @@ fun AppRoot(viewModel: MainViewModel = viewModel()) {
                     label = { Text("Patch") }
                 )
                 NavigationBarItem(
+                    selected = tab == FarewellTab.RULES,
+                    onClick = { tab = FarewellTab.RULES },
+                    icon = { Icon(Icons.AutoMirrored.Filled.List, contentDescription = null) },
+                    label = { Text("Rules") }
+                )
+                NavigationBarItem(
                     selected = tab == FarewellTab.DATA,
                     onClick = { tab = FarewellTab.DATA },
                     icon = { Icon(Icons.Default.Home, contentDescription = null) },
@@ -57,6 +65,7 @@ fun AppRoot(viewModel: MainViewModel = viewModel()) {
         val modifier = Modifier.padding(padding)
         when (tab) {
             FarewellTab.PATCH -> PatchScreen(state, viewModel, modifier)
+            FarewellTab.RULES -> RulesScreen(state, viewModel, modifier)
             FarewellTab.DATA -> HomeScreen(state, viewModel, modifier)
             FarewellTab.SETTINGS -> SettingsScreen(state, viewModel, modifier)
         }

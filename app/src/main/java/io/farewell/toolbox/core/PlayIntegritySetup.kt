@@ -61,7 +61,8 @@ object PlayIntegritySetup {
         val keyboxFile = File(context.filesDir, KEYBOX_FILE)
         val keybox = if (keyboxFile.exists()) keyboxFile.readText() else null
 
-        val json = buildConfig(pif, flags, keybox != null)
+        val rules = SpoofRules.load(context)
+        val json = buildConfig(pif, flags, keybox != null, rules)
         val configWrite = writeSetting("sys_keystore_cfg", json)
         if (configWrite.code != 0) {
             return@withContext PlayIntegrityResult(false, "Failed to write config: ${configWrite.output.trim()}")
@@ -72,10 +73,23 @@ object PlayIntegritySetup {
                 return@withContext PlayIntegrityResult(false, "Config saved, keybox failed: ${keyboxWrite.output.trim()}")
             }
         }
+        val ruleNote = if (rules.isEmpty) {
+            "no per-app rules"
+        } else {
+            "${rules.ruleCount} per-app rule(s): " +
+                listOfNotNull(
+                    rules.installer.size.takeIf { it > 0 }?.let { "$it installer" },
+                    rules.settings.values.sumOf { t -> t.values.sumOf { it.size } }
+                        .takeIf { it > 0 }?.let { "$it setting" },
+                    rules.remove.values.sumOf { it.size }.takeIf { it > 0 }?.let { "$it removal" },
+                    rules.features.size.takeIf { it > 0 }?.let { "$it feature" }
+                ).joinToString(", ")
+        }
         PlayIntegrityResult(
             true,
             "Play Integrity config applied for ${pifPackages.size} packages" +
-                if (keybox != null) " + keybox" else " (no keybox imported)",
+                if (keybox != null) " + keybox" else " (no keybox imported)" +
+                " ($ruleNote)",
             json
         )
     }
@@ -457,7 +471,12 @@ object PlayIntegritySetup {
         )
     }
 
-    private fun buildConfig(pif: JSONObject, flags: PlayIntegrityFlags, hasKeybox: Boolean): String {
+    private fun buildConfig(
+        pif: JSONObject,
+        flags: PlayIntegrityFlags,
+        hasKeybox: Boolean,
+        rules: SpoofRules
+    ): String {
         val root = JSONObject()
 
         val flagsObject = JSONObject()
@@ -534,6 +553,11 @@ object PlayIntegritySetup {
             props.put(pkg, entry)
         }
         root.put("props", props)
+
+        // Per-app spoof rules (installer source, Settings values/removals, system
+        // features). The hook has always read these sections; until now nothing
+        // wrote them, so the patched call sites had no config to act on.
+        rules.applyTo(root)
 
         return root.toString()
     }

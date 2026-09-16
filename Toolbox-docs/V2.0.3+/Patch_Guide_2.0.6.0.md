@@ -368,42 +368,45 @@ modified/rooted system.
 
 #### Toolbox configuration
 
-Once the patch check passes, enable **Advanced features**, then add entries in Toolbox. The stored format is
-version 2 and separates each app by table:
+Add rules in the **Rules** tab, then press **Apply Play Integrity setup** to write them to the
+device. The rules live in `filesDir/spoof-rules.json` and are merged into `sys_keystore_cfg`,
+which the hook reads through `HookConfig`. The full shape is:
 
 ```json
 {
-  "version": 2,
-  "apps": {
-    "com.example.app": {
-      "secure": { "android_id": "0123456789abcdef" },
-      "global": { "example_key": "1" },
-      "system": { "example_key": "value" }
-    }
-  }
+  "flags":     { "hide_dev_status": true, "hide_app_list": true, "secure_flag": false, "keybox_spoof": true },
+  "build":     { "*": { "MODEL": "Pixel 8 Pro" }, "com.google.android.gms": { "MODEL": "Pixel 8 Pro" } },
+  "props":     { "*": { "ro.build.fingerprint": "google/..." }, "com.google.android.gms": { "ro.product.model": "Pixel 8 Pro" } },
+  "installer": { "com.example.app": "com.android.vending" },
+  "settings":  { "apps": { "com.example.app": { "secure": { "android_id": "0123456789abcdef" },
+                                                 "global": { "example_key": "1" },
+                                                 "system": { "example_key": "value" } } } },
+  "remove":    { "secure": ["example_key"] },
+  "features":  { "android.hardware.keystore": true }
 }
 ```
 
-The per-app Settings spoof branch leaves its input unchanged when Advanced is
-off, the table is unsupported, the caller is system/Toolbox, the caller UID maps
-to more than one package, or no matching entry exists. Its input may already
-have been changed by HMA: HMA value filtering/removal runs separately and does
-not share every guard. Do not assume that switching Advanced off restores stock
-values for existing HMA rules. Per-app value spoofs are strings; a key removal
-is supplied by the HMA Settings rule through `shouldRemoveSetting(...)` above.
+Key points, all matching `HookConfig`'s readers exactly:
 
-Test one configured app, an unconfigured app, all three tables and a missing
-setting before shipping. Do not use this hook to bypass permissions or alter
-SettingsProvider's access checks.
+- `installer` is keyed by the **calling** package. `PackageManagerInstallerRule` wires the
+  one-argument `FILTER_INSTALLER(String)` overload and the hook resolves the key from
+  `callingUid()`, so a rule means "when *this* app asks for any package's installer, report
+  this value".
+- `settings` must sit under `settings.apps.<package>.<namespace>.<key>`. Namespaces are the
+  three real table names `global`, `secure` and `system`; anything else is ignored.
+- `remove` is namespace-wide, not per app: a listed key reads as absent for every caller.
+- `features` forces the answer of `PackageManager.hasSystemFeature` for that feature string.
+  A feature that is absent from the config falls through to the stock value.
 
-Host regression tests cover the probe/state reader and write-gate logic with
-Android/provider boundaries simulated; they do not prove real Binder identity,
-permissions, Compose behavior or ROM compatibility. On the target ROM, test
-missing/partial patches, root fallback with no patch, a stale enabled flag,
-permission-denied writes, rapid toggles and both Settings layouts. Also check
-ordinary GETs with a cold config cache for recursion, and verify that no probe
-keys are persisted. A successful capability check is not a full runtime audit.
-  
+The per-app Settings branch leaves its input unchanged when the table is unsupported, the
+caller is system/Toolbox, the caller UID maps to more than one package, or no matching entry
+exists. Do not use this hook to bypass permissions or alter SettingsProvider's access checks.
+
+Test one configured app, an unconfigured app, all three tables and a missing setting before
+shipping. The Rules tab validates package names and table names before anything reaches the
+hook, but it cannot prove runtime behaviour: on the target ROM, check a cold config cache,
+rapid toggles and both Settings layouts.
+
 ### Disable `FLAG_SECURE`  
   
 [Disable Secure Flag guide](Disable_Secure_Flag.md).  
