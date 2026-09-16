@@ -229,9 +229,10 @@ logcat -s farewelld                      # daemon/helper log lines
 - [Patch Guide 2.0.6.0 (EN)](Toolbox-docs/V2.0.3+/Patch_Guide_2.0.6.0.md) · [Tiếng Việt](Toolbox-docs/V2.0.3+/Patch_Guide_2.0.6.0_VI.md)
 - [CorePatch (signature checks)](Toolbox-docs/V2.0.3+/CorePatch.md) · [Disable FLAG_SECURE](Toolbox-docs/V2.0.3+/Disable_Secure_Flag.md) · [Android 17 notes](Toolbox-docs/V2.0.3+/notes-a17.md)
 - [Native daemon & installer](native/rom/README.md)
+- [ROM Audit: Surya (MIUI 12/13/14)](Toolbox-docs/V2.0.3+/ROM_Audit_Surya.md) · [Tiếng Việt](Toolbox-docs/V2.0.3+/ROM_Audit_Surya_VI.md) — what the stock ROMs actually contain, and which rules can fire
 - Reference smali for every patched call-site: `Toolbox-docs/Template/Template_V2060/{framework,service}/`
 
-**Advanced features** (per-app setting spoof) require a framework patch with probe support: the live check must reach both `SettingsProvider` hooks for Global/Secure/System, including missing keys. Installing only the APK or loading only the DEX is not enough — see the patch guide's *Advanced features: patch check* section.
+**Advanced features** (per-app setting spoof) are implemented **client-side** on `Settings$NameValueCache.getStringForUser`, which exists on all three surya ROMs and covers both app and `system_server` reads. There is deliberately **no** server-side `SettingsProvider` hook: the provider lives in `/system/priv-app/SettingsProvider/SettingsProvider.apk` (not `services.jar`) and exposes neither `getStringForUser` nor `getString` on surya MIUI 12/13/14. Installing only the APK or loading only the DEX is not enough — the framework patch carries the hook. See [ROM Audit: Surya](Toolbox-docs/V2.0.3+/ROM_Audit_Surya.md).
 
 ## ✨ Features
 
@@ -248,7 +249,7 @@ logcat -s farewelld                      # daemon/helper log lines
 ## 🗺️ Roadmap
 
 - [ ] ⚡ **Automated Patcher Tool 2.0.6+**
-- [ ] ⚙️ **ROM validation for Fake & Filter System Settings**: verify the documented `filterSettingValue` / `shouldRemoveSetting` patches and the Advanced capability check on each target ROM.
+- [x] ⚙️ **ROM validation for Fake & Filter System Settings** — done for surya MIUI 12/13/14. The documented server-side `filterSettingValue` / `shouldRemoveSetting` patches were audited and **removed**: the class they targeted is not reachable and has no such methods. Per-app Settings spoofing is client-side only. See [ROM Audit: Surya](Toolbox-docs/V2.0.3+/ROM_Audit_Surya.md) and re-run `tools/rom-audit/rom_audit.py` for any new ROM.
 - [ ] 📦 **Spoof Installer Source Package**: per-app installer-origin spoofing (`filterInstallerPackageName`, e.g. masquerade as `com.android.vending`).
 
 ## 🌍 Localization & Translations

@@ -4,6 +4,12 @@ build/
 !gradle/wrapper/gradle-wrapper.jar
 local.properties
 
+# AI assistant workspace data (memory notes, audits) — not project source
+.workbuddy-ai/
+
+# ROM audit tool output (generated; re-run tools/rom-audit/rom_audit.py)
+tools/rom-audit/*.json
+
 # Android
 *.apk
 *.aab
