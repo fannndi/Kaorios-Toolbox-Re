@@ -46,13 +46,13 @@ const/4 p1, 0x0
 
 Find the three `checkCapability` methods and make each method return `1`.
 
-### `android.content.pm.SigningDetails`
-
-**Smali example:** [`SigningDetails.smali`](../Template/Template_V2060/framework/SigningDetails.smali)
-
-Find the three `checkCapability` methods and make each method return `1`.
-
 In the same class, find `hasAncestorOrSelf` and make the method return `1`.
+
+> [!NOTE]
+> This is the only `SigningDetails` class on surya. `android.content.pm.SigningDetails`
+> (the top-level class AOSP moved to in Android 13) does **not** exist in any of the three
+> stock framework.jar files — verified by binary search, 0 hits on MIUI 12/13/14. There is
+> nothing to patch under that name.
 
 ### `android.util.apk.ApkSignatureSchemeV2Verifier`
 
@@ -143,13 +143,10 @@ Remove the `if-eqz v6, :cond_x` branch and its corresponding `:cond_x` label tha
 
 ### `com.android.internal.pm.pkg.parsing.ParsingPackageUtils`
 
-**Smali example:** [`ParsingPackageUtils.smali`](../Template/Template_V2060/framework/ParsingPackageUtils.smali)
-
-Find the section that checks for the string `"<manifest> specifies bad sharedUserId name \""`. Immediately before the related `if-eqz v4, :cond_x` branch, insert:
-
-```smali
-const/4 v4, 0x0
-```
+**Not applicable to surya.** This class is the Android 13+ replacement for the parsing
+logic in `PackageParser`. It does not exist in any of the three stock framework.jar files
+(0 hits on MIUI 12/13/14), so the `"<manifest> specifies bad sharedUserId name \""` check
+is patched in `android.content.pm.PackageParser` instead — see the first section above.
 
 ## 2. `services.jar`
 
@@ -165,41 +162,14 @@ Patch the following methods according to the specified return values:
 | `compareSignatures` | `0` |
 | `matchSignaturesCompat` | `1` |
 
-### `com.android.server.pm.InstallPackageHelper`
+> [!NOTE]
+> `InstallPackageHelper` and `ReconcilePackageUtils` are not patched: both are Android 13+
+> refactors of `PackageManagerService` and do not exist in any of the three stock
+> services.jar files (0 hits on MIUI 12/13/14).
 
-**Smali example:** [`InstallPackageHelper.smali`](../Template/Template_V2060/service/InstallPackageHelper.smali)
+## 3. `miui-services.jar`
 
-Find:
-
-```smali
-invoke-interface {p1}, Lcom/android/server/pm/pkg/AndroidPackage;->isLeavingSharedUser()Z
-```
-
-At the `if-eqz v12, :cond_x` branch immediately following this section, force the condition to allow it using the appropriate register for the ROM as reference:
-
-```smali
-const/4 v0, 0x1
-```
-
-### `com.android.server.pm.ReconcilePackageUtils`
-
-**Smali example:** [`ReconcilePackageUtils.smali`](../Template/Template_V2060/service/ReconcilePackageUtils.smali)
-
-Inside `.method static constructor <clinit>()V`, change:
-
-```smali
-const/4 v0, 0x0
-```
-
-to:
-
-```smali
-const/4 v0, 0x1
-```
-
-## 3. `miui-services.jar` (if present in the ROM)
-
-To allow system apps to be updated using third-party APKs:
-
-- Method `verifyIsolationViolation` -> `return-void`.
-- Method `canBeUpdate` -> `return-void`.
+**Not applicable to surya.** The `verifyIsolationViolation` and `canBeUpdate` methods this
+section used to target do **not** exist in `miui-services.jar` or `miui-framework.jar` on
+MIUI 13/14 (0 hits on both, and MIUI 12 ships neither jar). This matches the repository
+rule that those jars are never patched.

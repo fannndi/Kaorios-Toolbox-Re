@@ -1,9 +1,19 @@
 # Farewell Toolbox Framework 2.0.6.0  
-  
-**English** | [Tiếng Việt](Patch_Guide_2.0.6.0_VI.md)  
-  
-  
+
 > Keep the stock JARs. Do not replace a stock DEX or copy a complete template class into a different ROM.  
+
+> [!IMPORTANT]
+> **Scope: surya (POCO X3 / M2007J20CG, M2007J20CT, M2007J20CI) only** — MIUI 12
+> (Android 10), MIUI 13 and MIUI 14 (Android 12). Patches for classes that only exist in
+> Android 13+ have been removed; see [ROM Audit: Surya](ROM_Audit_Surya.md) for what each
+> stock ROM actually contains.
+
+> [!IMPORTANT]
+> **Hook class and method names are generated per build.** Everywhere this guide writes a
+> `Landroid/security/farewell/FarewellHook;->someMethod` style call, substitute the real
+> names from `build/hook-identity.txt` (or the generated
+> `patcher/src/main/kotlin/io/farewell/patcher/HookIdentity.kt`). The class name and all
+> method names are randomised on every build and must never be copied literally.
   
 ## 1. `framework.jar`  
   
@@ -194,9 +204,10 @@ invoke-static {}, Landroid/security/farewell/FarewellHook;->initSystemServer()V
 ---  
   
 ## Notes  
-  
-- Android 17 / SDK 37 also requires [the Build-field patch](notes-a17.md)..  
-  
+
+- The Build-field patch (`framework.build.unfinal`) is applied by the patcher on all three
+  surya ROMs, so no separate step is needed.  
+
 ## 3. Supplementary patches (test)  
   
 These are optional. Add only the feature you need, after the core patch boots correctly.  
@@ -223,10 +234,20 @@ return-object v0
 Use only the overload returning `String`; do not paste this into a `Pair`-returning overload.  
   
 ### Hide installed apps per caller  
-  
-Patch the Package Manager filter method used by the target ROM. Android 17 reference: `AppsFilterBase.shouldFilterApplication(...)`.    
-**Reference smali:** [`AppsFilterBase.smali`](../Template/Template_V2060/service/AppsFilterBase.smali)  
-  
+
+Patch the Package Manager filter method the target ROM actually has. The patcher handles
+this with `LegacyAppsFilterRule` on MIUI 13/14 and `FilterAppAccessRule` on MIUI 12:
+
+| ROM | Class | Method |
+|---|---|---|
+| MIUI 13 / 14 | `Lcom/android/server/pm/AppsFilter;` | `shouldFilterApplication(...)` |
+| MIUI 12 | `Lcom/android/server/pm/PackageManagerService;` | `filterAppAccessLPr(Lcom/android/server/pm/PackageSetting;II)Z` |
+
+> [!NOTE]
+> `AppsFilterBase` / `AppsFilterImpl` are Android 13+ and do **not** exist on surya
+> (0 hits in all three stock services.jar files), so there is nothing to patch under those
+> names.
+
 ```smali  
 # callingUid, null resolver, target package name, userId  
 invoke-static {vCallingUid, vNull, vTargetPackage, vUserId}, Landroid/security/farewell/FarewellHook;->shouldHideAppListForCaller(ILandroid/content/ContentResolver;Ljava/lang/String;I)Z  
@@ -234,18 +255,22 @@ move-result vResult
 if-eqz vResult, :cond_farewell_hide_stock  
 const/4 v0, 0x1  
 return v0  
-  
+
 :cond_farewell_hide_stock  
 ```  
   
 The argument order is fixed: `callingUid, resolver, targetPackageName, userId`. Find the real registers in your ROM; the template is reference only.  
   
-### Spoof installer source (Soon)  
-  
-**Reference class:** `Lcom/android/server/pm/ComputerEngine;`    
-**Reference smali:** [`ComputerEngine.smali`](../Template/Template_V2060/service/ComputerEngine.smali)    
-**Method:** `getInstallerPackageName(Ljava/lang/String;I)Ljava/lang/String;`  
-  
+### Spoof installer source  
+
+**Class:** `Lcom/android/server/pm/PackageManagerService;`    
+**Method:** `getInstallerPackageName(Ljava/lang/String;)Ljava/lang/String;`  
+
+> [!NOTE]
+> The method is declared on `PackageManagerService` itself on all three surya ROMs, so the
+> patcher uses `PackageManagerInstallerRule`. `ComputerEngine` (Android 13+) does not exist
+> on surya — 0 hits in all three stock services.jar files.
+
 After the stock installer value is resolved, pass it through:  
   
 ```smali  
@@ -263,35 +288,41 @@ This patch changes only the value returned to the app that is reading Settings;
 it never writes or changes the real setting. It supports the three exact table
 names `global`, `secure`, and `system`.
 
-**Patch location:** use the server-side `SettingsProvider` GET path while the
-incoming Binder caller identity is still active. Do **not** put this hook in a
-client cache such as `Settings$NameValueCache`, after `clearCallingIdentity()`,
-or in a method returning a `Bundle`/`Setting` object instead of the final
-`String` value.
+**Patch location:** `Landroid/provider/Settings$NameValueCache;` →
+`getStringForUser(Landroid/content/ContentResolver;Ljava/lang/String;I)Ljava/lang/String;`.
+The patcher applies this with `SettingsNameValueCacheRule`. `Settings$NameValueCache` lives
+in `framework.jar`, which sits on the boot classpath of every process, so the hook runs in
+the process doing the reading — the caller identity is the app itself and there is no Binder
+identity to preserve.
 
-Find the point immediately before the provider returns the stock `String`.
-Here `vNamespace` is the table name, `vName` is the setting key and `vValue` is
-the original value. `vNull` is any free local register initialized to null.
+> [!IMPORTANT]
+> There is deliberately **no** server-side `SettingsProvider` patch. On surya MIUI 12/13/14
+> `com.android.providers.settings.SettingsProvider` lives in
+> `/system/priv-app/SettingsProvider/SettingsProvider.apk`, **not** in `services.jar`, and it
+> declares neither `getStringForUser` nor `getString`. Its only String-returning entry point
+> is `getSettingValue(Landroid/os/Bundle;)Ljava/lang/String;`, whose body is effectively
+> `return request.getString("value")` — it carries no table name, so a per-app filter cannot
+> be built there. Patching the priv-app would also swap a signed system app for an unsigned
+> one, which the boot scanner rejects. See [ROM Audit: Surya](ROM_Audit_Surya.md).
+
+Insert at the top of the method, below `.registers X`. `p0` is the `ContentResolver`, `p1`
+the setting name, `p2` the user id and `v0` any free local register:
 
 ```smali
-# Apply a configured null/removal first. Use only when null is the ROM's
-# normal representation of a missing String setting.
-const/4 vNull, 0x0
-invoke-static {vNull, vNamespace, vName}, Landroid/security/farewell/FarewellHook;->shouldRemoveSetting(Landroid/content/ContentResolver;Ljava/lang/String;Ljava/lang/String;)Z
-move-result vRemove
-if-eqz vRemove, :cond_farewell_setting_value
-const/4 vValue, 0x0
-return-object vValue
+invoke-static {p0, p1, p2}, Landroid/security/farewell/FarewellHook;->hasSettingOverride(Ljava/lang/Object;Ljava/lang/String;I)Z
+move-result v0
+if-eqz v0, :cond_farewell_setting_stock
+invoke-static {p0, p1}, Landroid/security/farewell/FarewellHook;->settingOverrideValue(Ljava/lang/Object;Ljava/lang/String;)Ljava/lang/String;
+move-result-object v0
+return-object v0
 
-:cond_farewell_setting_value
-invoke-static {vNull, vNamespace, vName, vValue}, Landroid/security/farewell/FarewellHook;->filterSettingValue(Landroid/content/ContentResolver;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
-move-result-object vValue
-return-object vValue
+:cond_farewell_setting_stock
 ```
 
-Adapt register names and the missing-value return to the target ROM. If the
-method must do cleanup after producing `vValue`, keep that cleanup and insert
-only the two hook calls before its real return.
+The two entry points are ordered: `hasSettingOverride` decides whether an override exists
+for this app, and only then does `settingOverrideValue` produce the replacement `String`.
+Use only the `String`-returning overload; do not paste this into a `Pair`- or
+`Bundle`-returning method.
 
 #### Advanced features patch check
 
@@ -300,43 +331,40 @@ patch probe. Older builds without the probe do not satisfy the check, even if
 they report the same framework version.
 
 1. Install a matching Toolbox APK and framework DEX **with probe support**.
-2. Patch the real SettingsProvider GET path for **all three tables**: `global`,
-   `secure`, `system`. Run `shouldRemoveSetting` first, then `filterSettingValue`
-   when removal returns false, on the same provider thread as shown above.
+2. Patch `Settings$NameValueCache.getStringForUser` as shown above. The probe drives
+   the same two entry points, so a patch that skips either one fails the check.
 3. Cover missing keys as well as existing values. An early return for a missing
-   key must not skip these hooks. Preserve permission checks, Binder caller
-   identity and the ROM's required cleanup.
-4. Reboot after updating the framework/provider patch, reopen Toolbox and let
+   key must not skip these hooks.
+4. Reboot after updating the framework patch, reopen Toolbox and let
    its check finish before enabling **Advanced features**.
 
 The app requires a non-empty framework version and sends fresh, read-only
-challenges through each table's Settings reader. The probe responds only when
-both hook stages see the same namespace/key on the same thread. It runs before
+challenges through each table's Settings reader. The probe answers only when the
+override stage has run for the same namespace/key on the same thread. It runs before
 HMA/config reads and does not require Advanced to be enabled. It does not write
 test settings or trust saved working flags.
 
 | Situation | Expected behavior |
 |---|---|
 | Check pending or toggle write in progress | Switch disabled |
-| Framework absent/old, missing hook/table, or probe read fails | Advanced unavailable; patch-required message |
+| Framework absent/old, missing hook, or probe read fails | Advanced unavailable; patch-required message |
 | Matching framework and all three table probes pass | Switch available; enabling still requires write permission |
 | Root fallback enabled, but probe fails | Enabling remains blocked before any write fallback |
 | Saved Advanced flag is ON, but probe fails | Advanced UI stays unavailable; reading does not rewrite the saved flag |
 | Probe passes, but writing fails | Previous switch state retained; write failure shown |
 
-Both Settings layouts use the same check. Before writing an enabled value, the
+Before writing an enabled value, the
 app checks again; `true`/`TRUE` and surrounding Java-style whitespace follow the
 same boolean rules as the framework. Disabling is not blocked by the probe at
-the write API, although normal permissions/block policy still apply. A missing
-cache-sync API on an old/absent framework does not turn a successful direct
-Settings write into a reported failure.
+the write API, although normal permissions/block policy still apply.
 
 If the switch stays locked, verify the deployed framework contains the probe,
-both call sites execute for missing keys in every table, and the device rebooted
-into the patched files. Do not seed probe keys or force the saved Advanced flag
-to bypass the check. A matching version string or root access is insufficient.
-The probe checks Settings capability, not AppsFilter or installer-source hooks;
-it is not a security attestation against a modified/rooted system.
+that both call sites execute for missing keys in every table, and that the device
+rebooted into the patched files. Do not seed probe keys or force the saved
+Advanced flag to bypass the check. A matching version string or root access is
+insufficient. The probe checks Settings capability, not AppsFilter or
+installer-source hooks; it is not a security attestation against a
+modified/rooted system.
 
 #### Toolbox configuration
 

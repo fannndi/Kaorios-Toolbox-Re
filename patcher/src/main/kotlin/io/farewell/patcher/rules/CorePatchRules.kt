@@ -11,8 +11,12 @@ class SigningDetailsRule : MethodRule {
     override val name = "corepatch.signingdetails.checkcapability"
     override fun enabledFor(kind: JarKind) = kind == JarKind.FRAMEWORK || kind == JarKind.SERVICES
 
+    // Surya scope: all three ROMs declare PackageParser$SigningDetails, and none
+    // declares android.content.pm.SigningDetails (that move landed in AOSP in
+    // Android 13 and MIUI kept the nested class through Android 12). Verified by
+    // binary search of the stock framework.jar on MIUI 12/13/14 — 3 hits for the
+    // nested class, 0 for the top-level one on every ROM.
     private val targets = setOf(
-        "Landroid/content/pm/SigningDetails;",
         "Landroid/content/pm/PackageParser\$SigningDetails;"
     )
 

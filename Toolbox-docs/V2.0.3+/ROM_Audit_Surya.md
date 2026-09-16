@@ -1,10 +1,13 @@
 # ROM Audit: Surya (POCO X3 / M2007J20CG)
 
-**English** | [Tiếng Việt](ROM_Audit_Surya_VI.md)
-
 This page records what the **stock** surya MIUI ROMs actually contain, and what that
 means for the patcher. Every claim below was verified against the extracted stock
 images, not against upstream AOSP.
+
+> [!IMPORTANT]
+> **Scope is surya only** — MIUI 12 (Android 10), MIUI 13 and MIUI 14 (Android 12).
+> Rules that could only ever fire on Android 13+ have been removed from the patcher:
+> no surya ROM is A13+, and none of those classes exist in these images.
 
 > [!IMPORTANT]
 > The Farewell patch is written to be device-agnostic, but the *property* layer is not:
@@ -262,9 +265,7 @@ different API level, which is expected.
 | `MinimumSignatureScheme` | n/a | ok | ok |
 | `StrictJarVerifier` | ok | ok | ok |
 | `SystemServerInit` (invoke site) | ok | ok | ok |
-| `AppsFilter` / `AppsFilterImpl` (A13+) | n/a | n/a | n/a |
 | `LegacyAppsFilter` (A11/12) | n/a | ok | ok |
-| `InstallerSource` (A13+) | n/a | n/a | n/a |
 | `PackageManagerInstaller` | ok | ok | ok |
 | `FilterAppAccess` (`String,int,int`) | no-method | ok | ok |
 | `FilterAppAccess` (`PackageSetting,int,int`) | ok | no-method | no-method |
@@ -273,8 +274,11 @@ different API level, which is expected.
 | `WindowSecure` (`WindowState`) | no-method | ok | ok |
 | `WindowSecure` (`WindowStateAnimator`) | ok | ok | ok |
 | `LegacyWindowManagerSecure` (A10) | ok | n/a | n/a |
-| `WindowManagerCapture` (invoke site) | n/a | n/a | n/a |
 | `SettingsProvider` | no-class | no-class | no-class |
+
+Rows that used to be listed here for `AppsFilterBase` / `AppsFilterImpl`, `ComputerEngine`
+and `WindowManagerService.notAllowCaptureDisplay` have been removed along with their rules —
+see §7.
 
 ---
 
@@ -316,7 +320,6 @@ point of the exercise:
   is A11/12 and the gate is `30..32`.
 - `legacy.wm.isSecureLocked` and `legacy.devicepolicy.getScreenCaptureDisabled` fire on
   MIUI 12 only — correct, both are gated `0..30`.
-- `WindowManagerCapture` never fires anywhere — correct, the method is inlined away.
 - `corepatch.strictjarverifier.verifydigest` fires on **all three** — confirming the rule was
   never dead (see §7).
 
@@ -359,15 +362,37 @@ false alarm: the rule matches on **name + return type** only, so it fires correc
 These rules previously declared an unbounded `0..Int.MAX_VALUE` range, claiming
 coverage they never had. Each now carries the range the audit supports:
 
-| Rule | New `apiRange` | Why |
+| Rule | `apiRange` | Why |
 |---|---|---|
-| `AppsFilterRule` | `33..MAX` | `AppsFilterBase`/`AppsFilterImpl` are A13+; absent on all three ROMs |
-| `InstallerSourceRule` | `33..MAX` | `ComputerEngine.getInstallerPackageName` absent on all three |
-| `DevicePolicySecureRule` | `31..MAX` | `isScreenCaptureAllowed(int,boolean)` is A11+ |
-| `WindowManagerCaptureRule` | `33..MAX` | `notAllowCaptureDisplay` has **0 occurrences** — R8-inlined away on surya |
+| `DevicePolicySecureRule` | `31..MAX` | `isScreenCaptureAllowed(int,boolean)` is A11+; present on MIUI 13/14 only |
 | `LegacyAppsFilterRule` | `30..32` | `AppsFilter` exists A11/12 only; no AppsFilter class in A10 |
 | `LegacyWindowManagerSecureRule` | `0..30` | `WindowManagerService.isSecureLocked(WindowState)` is A10 only |
 | `MinimumSignatureSchemeRule` | `31..MAX` | method absent on MIUI 12 |
+
+### A13+ rules removed
+
+Three rules could only ever fire on Android 13+, and no surya ROM is A13+. Each was
+verified absent by binary search of all three stock images (0 hits everywhere), then
+deleted along with its smali template:
+
+| Rule removed | Class it targeted | Why it was dead on surya |
+|---|---|---|
+| `AppsFilterRule` | `AppsFilterBase` / `AppsFilterImpl` | A13+; A11/12 use `AppsFilter` (`LegacyAppsFilterRule`), A10 uses `filterAppAccess*` |
+| `InstallerSourceRule` | `ComputerEngine.getInstallerPackageName` | A13+; surya declares it on `PackageManagerService` (`PackageManagerInstallerRule`) |
+| `WindowManagerCaptureRule` | `WindowManagerService.notAllowCaptureDisplay` | R8-inlined away on all three ROMs |
+
+The `MODERN` / `modern-a13plus` profile was removed with them, and `JarPatcher.patch` /
+`DexPatchEngine` no longer default to a profile — callers must pass one of
+`surya-miui12`, `surya-miui13` or `surya-miui14`.
+
+`SigningDetailsRule` lost its `android.content.pm.SigningDetails` branch for the same
+reason: that class is absent from all three framework.jar files (0 hits), while
+`PackageParser$SigningDetails` is present (3 hits). MIUI kept the nested class through
+Android 12.
+
+The hook entry points those rules used (`SHOULD_HIDE_APP_LIST_FOR_CALLER`,
+`FILTER_INSTALLER`, `IS_SECURE_FLAG`) are all still reached by the surya rules, so the
+generated hook identity is unchanged.
 
 ---
 
@@ -384,9 +409,10 @@ These are deliberate, documented gaps rather than bugs.
   consulted for attestation.
 - **`ro.secure` / `ro.debuggable` on MIUI 12** can only be spoofed through the hook,
   not through build.prop (see §4).
-- **A13+ rules are untested on surya**, because no surya ROM in this set is A13+.
-  `AppsFilterRule`, `AppsFilterImpl`, `InstallerSourceRule` and
-  `WindowManagerCaptureRule` are written against upstream AOSP and stay dormant here.
+- **MIUI 12 keystore key generation is covered only by the legacy path.**
+  `GenerateSoftwareKeyPair` matches `android/security/keystore/AndroidKeyStoreKeyPairGeneratorSpi`
+  on MIUI 12 and the keystore2 class on MIUI 13/14, which is correct — but the legacy
+  variant has fewer call sites than keystore2, so MIUI 12 keygen coverage is thinner.
 
 ---
 

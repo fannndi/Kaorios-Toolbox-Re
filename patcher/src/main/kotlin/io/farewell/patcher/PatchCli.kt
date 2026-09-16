@@ -14,7 +14,7 @@ fun main(args: Array<String>) {
     var hook: File? = null
     var kind = JarKind.FRAMEWORK
     var scan = false
-    var profile = PlatformProfiles.MODERN
+    var profile: PlatformProfile? = null
     var grep: Regex? = null
     var verifyKeybox: File? = null
     var fetchIntegrity = false
@@ -84,9 +84,11 @@ fun main(args: Array<String>) {
 
     val target = output ?: error("--output is required")
     val hookDex = hook?.takeIf { it.exists() }?.readBytes()
+    val activeProfile = profile
+        ?: error("--profile is required (${PlatformProfiles.ALL.joinToString { it.id }})")
 
-    println("Patching ${source.absolutePath} ($kind, ${profile.id})")
-    val report = JarPatcher.patch(source, target, kind, hookDex, profile) { message -> println("  $message") }
+    println("Patching ${source.absolutePath} ($kind, ${activeProfile.id})")
+    val report = JarPatcher.patch(source, target, kind, hookDex, activeProfile) { message -> println("  $message") }
     println("Report: ${report.summary()}")
     for (outcome in report.outcomes) {
         println("  ${if (outcome.applied) "+" else "-"} ${outcome.rule} ${outcome.detail} ${outcome.target}")
@@ -126,48 +128,47 @@ private fun grepClasses(source: File, pattern: Regex) {
 private fun scanJar(source: File) {
     println("Scanning ${source.absolutePath}")
     val container = DexFileFactory.loadDexContainer(source, Opcodes.getDefault())
+    // Exactly the classes the rules look for, surya scope only. Both keystore
+    // generations are listed because MIUI 12 uses android.security.keystore and
+    // MIUI 13/14 use android.security.keystore2. SettingsProvider is deliberately
+    // absent: it lives in /system/priv-app/SettingsProvider/SettingsProvider.apk
+    // and never in services.jar, so no SERVICES-kind rule can reach it.
     val targets = setOf(
-        "Lcom/android/server/pm/AppsFilterBase;",
-        "Lcom/android/server/pm/AppsFilterImpl;",
-        "Lcom/android/server/pm/AppsFilter;",
-        "Lcom/android/server/pm/ComputerEngine;",
-        "Lcom/android/server/pm/PackageManagerService;",
-        "Lcom/android/server/pm/InstallPackageHelper;",
-        "Lcom/android/server/SystemServer;",
+        // framework.jar
+        "Landroid/app/Instrumentation;",
+        "Landroid/app/ApplicationPackageManager;",
         "Landroid/os/Build;",
         "Landroid/os/Build\$VERSION;",
+        "Landroid/os/SystemProperties;",
+        "Landroid/provider/Settings\$NameValueCache;",
+        "Landroid/provider/Settings_NameValueCache;",
         "Landroid/security/keystore2/AndroidKeyStoreKeyPairGeneratorSpi;",
         "Landroid/security/keystore2/AndroidKeyStoreSpi;",
         "Landroid/security/keystore/AndroidKeyStoreKeyPairGeneratorSpi;",
         "Landroid/security/keystore/AndroidKeyStoreSpi;",
-        "Landroid/provider/Settings\$NameValueCache;",
-        "Landroid/provider/Settings_NameValueCache;",
-        "Lcom/android/providers/settings/SettingsProvider;",
-        "Landroid/app/Instrumentation;",
-        "Landroid/app/ApplicationPackageManager;",
-        "Lcom/android/server/devicepolicy/DevicePolicyCacheImpl;",
-        "Lcom/android/server/wm/WindowState;",
-        "Lcom/android/server/wm/WindowStateAnimator;",
-        "Lcom/android/server/wm/WindowManagerService;",
+        "Landroid/content/pm/PackageParser\$SigningDetails;",
+        "Landroid/content/pm/SigningDetails;",
         "Landroid/util/apk/ApkSignatureSchemeV2Verifier;",
         "Landroid/util/apk/ApkSignatureSchemeV3Verifier;",
         "Landroid/util/apk/ApkSigningBlockUtils;",
         "Landroid/util/apk/ApkSignatureVerifier;",
-        "Landroid/content/pm/SigningDetails;",
-        "Landroid/content/pm/PackageParser\$SigningDetails;",
         "Landroid/util/jar/StrictJarVerifier;",
-        "Lcom/android/server/pm/PackageManagerServiceUtils;",
-        "Lcom/android/server/pm/KeySetManagerService;"
+        // services.jar
+        "Lcom/android/server/SystemServer;",
+        "Lcom/android/server/pm/AppsFilter;",
+        "Lcom/android/server/pm/PackageManagerService;",
+        "Lcom/android/server/devicepolicy/DevicePolicyCacheImpl;",
+        "Lcom/android/server/wm/WindowState;",
+        "Lcom/android/server/wm/WindowStateAnimator;",
+        "Lcom/android/server/wm/WindowManagerService;"
     )
-    val settingsProviderHint = Regex("SettingsProvider")
     var classes = 0
     for (entryName in container.dexEntryNames) {
         val entry = container.getEntry(entryName) ?: continue
         val dexFile = entry.dexFile
         for (classDef in dexFile.classes) {
             classes++
-            val interesting = classDef.type in targets || settingsProviderHint.containsMatchIn(classDef.type)
-            if (!interesting) continue
+            if (classDef.type !in targets) continue
             println("CLASS ${classDef.type}  [${entryName}]")
             val finalFields = classDef.fields.filter { (it.accessFlags and 0x10) != 0 }.map { it.name }
             if (finalFields.isNotEmpty()) {

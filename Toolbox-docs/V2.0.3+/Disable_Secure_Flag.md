@@ -1,7 +1,5 @@
 # Farewell Toolbox Secure Flag Guide
 
-[Tiếng Việt](Disable_Secure_Flag_VI.md)
-
 Secure Flag need Framework dex 2.0.3+
 
 ## Services.jar

@@ -1,6 +1,5 @@
 package io.farewell.patcher
 
-import io.farewell.patcher.rules.AppsFilterRule
 import io.farewell.patcher.rules.BuildFieldClassRule
 import io.farewell.patcher.rules.CertificateChainRule
 import io.farewell.patcher.rules.CertificateChainAliasRule
@@ -13,7 +12,6 @@ import io.farewell.patcher.rules.HideDevStatusRule
 import io.farewell.patcher.rules.HOOK_CLASS
 import io.farewell.patcher.rules.ImmutableClassDefBuilder
 import io.farewell.patcher.rules.InstrumentationInitRule
-import io.farewell.patcher.rules.InstallerSourceRule
 import io.farewell.patcher.rules.FilterAppAccessRule
 import io.farewell.patcher.rules.PackageManagerInstallerRule
 import io.farewell.patcher.rules.MessageDigestForceRule
@@ -24,7 +22,6 @@ import io.farewell.patcher.rules.StrictJarVerifierRule
 import io.farewell.patcher.rules.SystemPropertiesPrimitiveRule
 import io.farewell.patcher.rules.SystemPropertiesRule
 import io.farewell.patcher.rules.SystemServerInitRule
-import io.farewell.patcher.rules.WindowManagerCaptureRule
 import io.farewell.patcher.rules.WindowSecureRule
 import io.farewell.patcher.rules.LegacyAppsFilterRule
 import io.farewell.patcher.rules.LegacyScreenCaptureRule
@@ -43,7 +40,7 @@ import java.io.File
 
 class DexPatchEngine(
     private val kind: JarKind,
-    private val profile: PlatformProfile = PlatformProfiles.MODERN
+    private val profile: PlatformProfile
 ) {
 
     private data class RuleStat(var count: Int = 0, val samples: MutableList<String> = mutableListOf())
@@ -69,15 +66,12 @@ class DexPatchEngine(
         HideDevStatusRule(),
         SettingsNameValueCacheRule(),
         SystemServerInitRule(),
-        AppsFilterRule(),
         LegacyAppsFilterRule(),
-        InstallerSourceRule(),
         PackageManagerInstallerRule(),
         FilterAppAccessRule(),
         DevicePolicySecureRule(),
         LegacyScreenCaptureRule(),
         WindowSecureRule(),
-        WindowManagerCaptureRule(),
         LegacyWindowManagerSecureRule(),
         SigningDetailsRule(),
         MessageDigestForceRule(),

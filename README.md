@@ -63,24 +63,27 @@ generateHookIdentity ──► build/hook-identity.txt (per-build random class +
 
 ## 📱 Supported ROM profiles
 
+**Scope is surya only** — POCO X3 (`M2007J20CG` / `M2007J20CT` / `M2007J20CI`).
+
 | Profile id | Device | ROM | Android |
 |---|---|---|---|
 | `surya-miui12` | POCO X3 (surya) | MIUI 12 | 10 (SDK 29) |
 | `surya-miui13` | POCO X3 (surya) | MIUI 13 | 12 (SDK 31) |
 | `surya-miui14` | POCO X3 (surya) | MIUI 14 | 12 (SDK 31) |
-| `modern-a13plus` | any | AOSP/MIUI 13+ | 13+ |
 
-The app detects device codename, MIUI version and Android API, then picks the profile automatically. Rules are gated by `apiRange`, so legacy (keystore v1, `AppsFilter`, `DevicePolicyCacheImpl.getScreenCaptureDisabled`) and modern (keystore2, `AppsFilterBase`, WMS capture) patch sets stay separate and maintainable.
+The app detects device codename, MIUI version and Android API, then picks the profile automatically. Rules are gated by `apiRange`, so the legacy (keystore v1, `AppsFilter`, `DevicePolicyCacheImpl.getScreenCaptureDisabled`) and modern (keystore2, `WindowState.isSecureLocked`) patch sets stay separate and maintainable. Rules that could only fire on Android 13+ have been removed — no surya ROM is A13+.
 
 ### ROM audit notes (surya MIUI 12 / 13 / 14)
 
-- Patch targets live in `/system/framework/framework.jar` and `/system/framework/services.jar`. `miui-framework.jar` (boot classpath), `miui-services.jar` and `miuix.jar` contain no copies of the patched classes, so they stay untouched.
+- Patch targets live in `/system/framework/framework.jar` and `/system/framework/services.jar`. `miui-framework.jar` (boot classpath), `miui-services.jar` and `miuix.jar` contain no copies of the patched classes, so they stay untouched. (MIUI 12 ships none of those three jars at all.)
 - `SettingsProvider.apk` is **never modified**. Settings spoof/removal/probe hooks `Settings$NameValueCache.getStringForUser` client-side, which exists in all three ROMs and covers both app and `system_server` reads.
-- Installer spoof uses `PackageManagerService.getInstallerPackageName(String)` on MIUI 12/13/14 and `ComputerEngine` on Android 13+.
+- Installer spoof uses `PackageManagerService.getInstallerPackageName(String)`, which is where all three ROMs declare it.
 - App-list hiding uses `AppsFilter` (MIUI 13/14) and `PackageManagerService.filterAppAccess*` (MIUI 12).
 - Expected absences on MIUI 12 (Android 10): `ApkSignatureVerifier.getMinimumSignatureSchemeVersionForTargetSdk` and `AppsFilter.shouldFilterApplication` (the app-filter path there is `PackageManagerService.filterAppAccessLPr`).
 - Target jars use DEX 039 on all three ROMs; the A17-only 040 normalization never triggers.
 - The installer deletes exactly the boot artifacts that exist (`boot-framework.*` under `framework/arm[64]`, `framework/oat/arm64/services.*`) plus dalvik caches, so ART re-verifies and recompiles the patched jars on first boot. `miui-services` / `boot-miui-framework` artifacts are left alone because those jars are not patched.
+
+Full findings, including the per-SKU property trap that made the identity spoof a no-op before it was fixed: [ROM Audit: Surya](Toolbox-docs/V2.0.3+/ROM_Audit_Surya.md).
 
 ## 🛡️ Play Integrity / Play Store certification
 
@@ -226,10 +229,10 @@ logcat -s farewelld                      # daemon/helper log lines
 
 ## 📚 Documentation
 
-- [Patch Guide 2.0.6.0 (EN)](Toolbox-docs/V2.0.3+/Patch_Guide_2.0.6.0.md) · [Tiếng Việt](Toolbox-docs/V2.0.3+/Patch_Guide_2.0.6.0_VI.md)
-- [CorePatch (signature checks)](Toolbox-docs/V2.0.3+/CorePatch.md) · [Disable FLAG_SECURE](Toolbox-docs/V2.0.3+/Disable_Secure_Flag.md) · [Android 17 notes](Toolbox-docs/V2.0.3+/notes-a17.md)
+- [Patch Guide 2.0.6.0](Toolbox-docs/V2.0.3+/Patch_Guide_2.0.6.0.md)
+- [CorePatch (signature checks)](Toolbox-docs/V2.0.3+/CorePatch.md) · [Disable FLAG_SECURE](Toolbox-docs/V2.0.3+/Disable_Secure_Flag.md)
 - [Native daemon & installer](native/rom/README.md)
-- [ROM Audit: Surya (MIUI 12/13/14)](Toolbox-docs/V2.0.3+/ROM_Audit_Surya.md) · [Tiếng Việt](Toolbox-docs/V2.0.3+/ROM_Audit_Surya_VI.md) — what the stock ROMs actually contain, and which rules can fire
+- [ROM Audit: Surya (MIUI 12/13/14)](Toolbox-docs/V2.0.3+/ROM_Audit_Surya.md) — what the stock ROMs actually contain, which rules can fire, and who wins each property key
 - ROM porting tools in `tools/rom-audit/`: `rom_audit.py` (what a ROM contains vs. what the rules need) and `prop_resolve.py` (which property file wins each key, `import` chain included)
 - Reference smali for every patched call-site: `Toolbox-docs/Template/Template_V2060/{framework,service}/`
 
@@ -251,7 +254,8 @@ logcat -s farewelld                      # daemon/helper log lines
 
 - [ ] ⚡ **Automated Patcher Tool 2.0.6+**
 - [x] ⚙️ **ROM validation for Fake & Filter System Settings** — done for surya MIUI 12/13/14. The documented server-side `filterSettingValue` / `shouldRemoveSetting` patches were audited and **removed**: the class they targeted is not reachable and has no such methods. Per-app Settings spoofing is client-side only. See [ROM Audit: Surya](Toolbox-docs/V2.0.3+/ROM_Audit_Surya.md) and re-run `tools/rom-audit/rom_audit.py` for any new ROM.
-- [ ] 📦 **Spoof Installer Source Package**: per-app installer-origin spoofing (`filterInstallerPackageName`, e.g. masquerade as `com.android.vending`).
+- [ ] 📦 **Spoof Installer Source Package**: the hook side is done (`FILTER_INSTALLER` is reached by `PackageManagerInstallerRule` on all three ROMs), but the app does not yet write the `installer` section of `sys_keystore_cfg`, so the feature is inert. Needs a config writer + UI.
+- [ ] 🧩 **Per-app spoofing manager**: same gap — the hook reads `settings` / `remove` / `installer`, the app never writes them.
 
 ## 🌍 Localization & Translations
 
@@ -272,7 +276,7 @@ If you are an LLM or a new developer touching this repo, these are the load-bear
 6. **The two config blobs are the app↔hook state contract**: `sys_keystore_cfg` (PIF/flags) and `sys_keybox_cfg` (keybox), both `k2:` base64+XOR via `Codec`/`HookCodec`. Any field added on the app side must be consumed on the hook side too.
 7. **`farewelld` only updates existing properties** and skips long/empty values; the property-area layout is pinned to bionic (see `native/rom/README.md`). Do not make it create new properties.
 8. **The installer must stay abort-safe**: if any manifest entry cannot be written, abort before changing anything. The backup/restore contract (`/data/media/0/Farewell/backup-<stamp>/` + generated `restore.sh`) is what users rely on for recovery — validate changes with `native/tests/installer-test.sh`.
-9. **Docs are bilingual (EN + `_VI`)** and the smali templates in `Toolbox-docs/Template/Template_V2060/` are the canonical call-site reference — keep them in sync when rules change.
+9. **Scope is surya, and the docs say so.** Supported ROMs are MIUI 12 (Android 10), MIUI 13 and MIUI 14 (Android 12) on POCO X3 only. Do not add rules or profiles for classes that only exist on Android 13+ — audit the stock images first with `tools/rom-audit/rom_audit.py`, and check who wins each property key with `tools/rom-audit/prop_resolve.py`. Docs are **English only**; the smali templates in `Toolbox-docs/Template/Template_V2060/` are the canonical call-site reference — keep them in sync when rules change, and delete a template when its rule goes.
 10. **Version strings** (`v2.0.6.0`, guide filenames) appear across docs and releases; bump them together, and keep `DATA_BASE_URL` in `app/build.gradle.kts` pointed at the published `Toolbox-data` raw URL.
 
 ## 🙏 Credits

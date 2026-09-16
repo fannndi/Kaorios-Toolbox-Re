@@ -23,7 +23,7 @@ object JarPatcher {
         output: File,
         kind: JarKind,
         hookDex: ByteArray?,
-        profile: PlatformProfile = PlatformProfiles.MODERN,
+        profile: PlatformProfile,
         log: (String) -> Unit = {}
     ): PatchReport {
         val engine = DexPatchEngine(kind, profile)

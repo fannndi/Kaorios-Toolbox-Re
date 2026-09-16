@@ -184,33 +184,27 @@ object PlatformProfiles {
         ) + modernPropTargets
     )
 
-    val MODERN = PlatformProfile(
-        id = "modern-a13plus",
-        deviceCodename = null,
-        androidApi = 33,
-        miui = MiuiMajor.NONE,
-        targets = listOf(
-            PatchTarget(JarKind.FRAMEWORK, FRAMEWORK),
-            PatchTarget(JarKind.SERVICES, SERVICES)
-        ) + modernPropTargets
-    )
-
-    val ALL = listOf(SURYA_MIUI12, SURYA_MIUI13, SURYA_MIUI14, MODERN)
+    val ALL = listOf(SURYA_MIUI12, SURYA_MIUI13, SURYA_MIUI14)
 
     fun byId(id: String): PlatformProfile =
         ALL.firstOrNull { it.id.equals(id, ignoreCase = true) }
             ?: error("Unknown profile: $id (${ALL.joinToString { it.id }})")
 
+    /**
+     * Pick the profile for a device. Scope is surya only: MIUI 12 (Android 10),
+     * MIUI 13 and MIUI 14 (both Android 12). Anything else falls back to the
+     * closest surya profile by API level, but [PatchRepository] refuses to build
+     * a zip for a device where [supportsDevice] is false, so the fallback is only
+     * used to populate the UI.
+     */
     fun resolve(codename: String?, androidApi: Int, miui: MiuiMajor): PlatformProfile {
-        val surya = codename?.equals("surya", ignoreCase = true) == true
-        if (surya) {
-            SURYA_MIUI12.takeIf { miui == MiuiMajor.MIUI12 }?.let { return it }
-            SURYA_MIUI13.takeIf { miui == MiuiMajor.MIUI13 }?.let { return it }
-            SURYA_MIUI14.takeIf { miui == MiuiMajor.MIUI14 }?.let { return it }
-            if (androidApi == 29) return SURYA_MIUI12
-            if (androidApi == 31) return SURYA_MIUI14
+        when (miui) {
+            MiuiMajor.MIUI12 -> return SURYA_MIUI12
+            MiuiMajor.MIUI13 -> return SURYA_MIUI13
+            MiuiMajor.MIUI14 -> return SURYA_MIUI14
+            MiuiMajor.NONE -> Unit
         }
-        return MODERN.copy(androidApi = maxOf(androidApi, MODERN.androidApi))
+        return if (androidApi <= SURYA_MIUI12.androidApi) SURYA_MIUI12 else SURYA_MIUI14
     }
 
     fun supportsDevice(codename: String?): Boolean =
