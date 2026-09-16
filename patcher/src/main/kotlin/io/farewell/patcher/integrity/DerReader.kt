@@ -62,12 +62,31 @@ class DerReader(private val data: ByteArray, private var offset: Int = 0, privat
     fun oid(tlv: Tlv): String {
         val bytes = content(tlv)
         if (bytes.isEmpty()) return ""
-        val builder = StringBuilder()
-        val first = bytes[0].toInt() and 0xFF
-        builder.append(first / 40).append('.').append(first % 40)
-        var value = 0L
-        for (index in 1 until bytes.size) {
+
+        // The first subidentifier is itself a base-128 value and may span several
+        // bytes; it encodes `40 * arc0 + arc1`. arc1 only fits in `value % 40` while
+        // arc0 is 0 or 1 (DER caps arc1 at 39 there), so the split has to be done on
+        // the decoded value rather than on the raw first byte.
+        var index = 0
+        var first = 0L
+        while (index < bytes.size) {
             val b = bytes[index].toInt() and 0xFF
+            index++
+            first = (first shl 7) or (b and 0x7F).toLong()
+            if ((b and 0x80) == 0) break
+        }
+        val arc0 = when {
+            first < 40 -> 0L
+            first < 80 -> 1L
+            else -> 2L
+        }
+
+        val builder = StringBuilder()
+        builder.append(arc0).append('.').append(first - arc0 * 40)
+        var value = 0L
+        while (index < bytes.size) {
+            val b = bytes[index].toInt() and 0xFF
+            index++
             value = (value shl 7) or (b and 0x7F).toLong()
             if ((b and 0x80) == 0) {
                 builder.append('.').append(value)
