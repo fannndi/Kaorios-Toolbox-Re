@@ -204,8 +204,21 @@ Requirements: **JDK 17+**, Android SDK (platform 37, build-tools 36/37), Android
 ./gradlew :app:assembleDebug                        # build the APK (also builds hook.dex)
 ./gradlew -PrenewHookIdentity :app:assembleDebug    # rotate the per-build hook identity
 ./gradlew -PhookObfuscate=false :app:assembleDebug  # plain-D8 hook dex for debugging
+./gradlew :patcher:test                             # unit tests (pure JVM, no device needed)
 pwsh -File native/build.ps1                         # build farewelld (arm64-v8a)
 ```
+
+### Tests
+
+`./gradlew :patcher:test` runs the suite in `patcher/src/test/` — no device or ROM required:
+
+| Class | Covers |
+|---|---|
+| `PropPatcherTest` | replace-in-place vs append-at-EOF, `ro.boot.*` blocking, CRLF preservation, and the per-SKU import trap that made the identity spoof a no-op |
+| `PlatformProfileTest` | the per-SKU property targets, per-partition split, surya-only scope, and the "never patch `SettingsProvider.apk` / `miui-*.jar` / `miuix.jar`" invariant |
+| `SpoofRulesTest` | the per-app config shape, asserted against the exact paths `HookConfig` walks |
+
+The app module has no JVM unit tests: AGP needs `androidJdkImage` for `compileDebugJavaWithJavac` even with no Java sources, and that transform fails on JDK 26. Any pure logic worth testing belongs in `:patcher` — which is why `SpoofRules` lives there and only file IO stays in the app.
 
 ### Patcher CLI
 

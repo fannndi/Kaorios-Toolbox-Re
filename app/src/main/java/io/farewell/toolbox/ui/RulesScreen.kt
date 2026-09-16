@@ -28,7 +28,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import io.farewell.toolbox.core.SpoofRules
+import io.farewell.patcher.SpoofRules
 
 /**
  * Editor for the per-app spoof rules the boot-classpath hook consumes.

@@ -1,19 +1,21 @@
-package io.farewell.toolbox.core
+package io.farewell.patcher
 
-import android.content.Context
 import org.json.JSONArray
 import org.json.JSONObject
-import java.io.File
 
 /**
  * Per-app spoof rules that the boot-classpath hook consumes from `sys_keystore_cfg`.
  *
- * The hook side (`HookConfig`) has always read these four sections; the app simply
- * never wrote them, which made installer-source spoofing and per-app Settings
- * spoofing inert — the patched call sites were wired but no config ever arrived.
- * This type is the missing writer.
+ * This is pure JVM code with no Android dependency, so it lives beside the rest of
+ * the app↔hook protocol and is covered by `SpoofRulesTest`. The app owns the file
+ * IO (`SpoofRulesStore`).
  *
- * Exact shapes the hook expects (see `hook/.../HookConfig.java`):
+ * The hook side (`HookConfig.java`) has always read these four sections; the app
+ * simply never wrote them, which made installer-source spoofing and per-app Settings
+ * spoofing inert — the patched call sites were wired but no config ever arrived.
+ * This type is the writer.
+ *
+ * Exact shapes the hook expects:
  *
  * ```json
  * {
@@ -27,14 +29,14 @@ import java.io.File
  * - `installer` is keyed by the **calling** package, not the queried one:
  *   `PackageManagerInstallerRule` wires the one-argument `FILTER_INSTALLER(String)`
  *   overload, and `AppFilterSpoofer.filterInstallerPackageNameAuto` resolves the key
- *   through `HookState.packageForUid(callingUid())`. So a rule means "when *this*
- *   app asks for any package's installer, report this value instead".
+ *   through `HookState.packageForUid(callingUid())`. A rule therefore means "when
+ *   *this* app asks for any package's installer, report this value instead".
  * - `settings` only ever changes what is returned to the reading app; the real
  *   setting is never written.
  * - `remove` is namespace-wide (not per app): a listed key reads as absent for
- *   every caller. Namespaces are the three real table names.
+ *   every caller.
  * - `features` answers `PackageManager.hasSystemFeature` for the given feature
- *   string; `null` from the hook means "fall through to the stock value".
+ *   string; absence from the config means "fall through to the stock value".
  */
 data class SpoofRules(
     val installer: Map<String, String> = emptyMap(),
@@ -53,6 +55,11 @@ data class SpoofRules(
             remove.values.sumOf { it.size } +
             features.size
 
+    /**
+     * Serialise to the shapes `HookConfig` reads. Invalid package names, unknown
+     * table names and blank values are dropped rather than shipped, so a typo can
+     * never reach the hook as a silently-inert entry.
+     */
     fun toJson(): JSONObject {
         val root = JSONObject()
 
@@ -121,8 +128,6 @@ data class SpoofRules(
         /** The three real Settings table names; the hook matches these exactly. */
         val NAMESPACES = listOf("global", "secure", "system")
 
-        private const val FILE_NAME = "spoof-rules.json"
-
         /**
          * Permissive package check: at least two dot-separated segments, each
          * starting with a letter. Deliberately not a full Android package regex —
@@ -137,25 +142,6 @@ data class SpoofRules(
                     segment.first().isLetter() &&
                     segment.all { it.isLetterOrDigit() || it == '_' }
             }
-        }
-
-        private fun file(context: Context): File = File(context.filesDir, FILE_NAME)
-
-        fun load(context: Context): SpoofRules {
-            val target = file(context)
-            if (!target.exists()) return SpoofRules()
-            return try {
-                fromJson(JSONObject(target.readText()))
-            } catch (throwable: Throwable) {
-                SpoofRules()
-            }
-        }
-
-        fun save(context: Context, rules: SpoofRules): Boolean = try {
-            file(context).writeText(rules.toJson().toString(2))
-            true
-        } catch (throwable: Throwable) {
-            false
         }
 
         fun fromJson(root: JSONObject): SpoofRules {

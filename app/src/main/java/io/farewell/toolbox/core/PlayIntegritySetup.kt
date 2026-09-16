@@ -2,6 +2,7 @@ package io.farewell.toolbox.core
 
 import android.content.Context
 import io.farewell.patcher.PropPartition
+import io.farewell.patcher.SpoofRules
 import io.farewell.patcher.integrity.IntegrityData
 import io.farewell.patcher.integrity.KeyboxVerifier
 import kotlinx.coroutines.Dispatchers
@@ -61,7 +62,7 @@ object PlayIntegritySetup {
         val keyboxFile = File(context.filesDir, KEYBOX_FILE)
         val keybox = if (keyboxFile.exists()) keyboxFile.readText() else null
 
-        val rules = SpoofRules.load(context)
+        val rules = SpoofRulesStore.load(context)
         val json = buildConfig(pif, flags, keybox != null, rules)
         val configWrite = writeSetting("sys_keystore_cfg", json)
         if (configWrite.code != 0) {

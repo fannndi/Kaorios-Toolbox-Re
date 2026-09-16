@@ -12,8 +12,9 @@ import io.farewell.toolbox.core.NativeService
 import io.farewell.toolbox.core.PatchRepository
 import io.farewell.toolbox.core.PlayIntegrityFlags
 import io.farewell.toolbox.core.PlayIntegritySetup
+import io.farewell.patcher.SpoofRules
 import io.farewell.toolbox.core.RootShell
-import io.farewell.toolbox.core.SpoofRules
+import io.farewell.toolbox.core.SpoofRulesStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -56,7 +57,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             keyboxCount = PlayIntegritySetup.keyboxFiles(application).size,
             autoRefresh = AutoRefresh.isEnabled(application),
             autoRefreshLast = AutoRefresh.lastResult(application),
-            rules = SpoofRules.load(application)
+            rules = SpoofRulesStore.load(application)
         )
     )
     val state: StateFlow<PatchUiState> = _state
@@ -68,7 +69,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      */
     fun updateRules(transform: (SpoofRules) -> SpoofRules) {
         val updated = transform(_state.value.rules)
-        val saved = SpoofRules.save(getApplication(), updated)
+        val saved = SpoofRulesStore.save(getApplication(), updated)
         _state.update {
             it.copy(
                 rules = updated,
@@ -82,7 +83,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun clearRules() {
-        val saved = SpoofRules.save(getApplication(), SpoofRules())
+        val saved = SpoofRulesStore.save(getApplication(), SpoofRules())
         _state.update {
             it.copy(
                 rules = SpoofRules(),

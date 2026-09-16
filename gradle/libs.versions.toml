@@ -8,6 +8,7 @@ coroutines = "1.10.2"
 smaliDexlib2 = "3.0.10"
 json = "20240303"
 r8 = "9.4.17"
+junit = "4.13.2"
 
 [libraries]
 compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }
@@ -22,6 +23,7 @@ coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutin
 smali-dexlib2 = { group = "com.android.tools.smali", name = "smali-dexlib2", version.ref = "smaliDexlib2" }
 json = { group = "org.json", name = "json", version.ref = "json" }
 r8 = { group = "com.android.tools", name = "r8", version.ref = "r8" }
+junit = { group = "junit", name = "junit", version.ref = "junit" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

@@ -21,7 +21,10 @@ kotlin {
 
 dependencies {
     api(libs.smali.dexlib2)
-    implementation(libs.json)
+    // `api`, not `implementation`: SpoofRules exposes JSONObject in its public API,
+    // so consumers (the app, the CLI) need the type on their compile classpath.
+    api(libs.json)
+    testImplementation(libs.junit)
 }
 
 tasks.named("compileKotlin") {
