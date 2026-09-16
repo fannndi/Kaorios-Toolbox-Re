@@ -220,8 +220,9 @@ pwsh -File native/build.ps1                         # build farewelld (arm64-v8a
 | `JarPatcherTest` | the dex engine against synthetic jars (`DexFixture`): a rule fires on its exact signature, the patched body is asserted instruction by instruction, `apiRange` gating keeps a rule dormant below its API level, the hook dex is injected as the next `classesN.dex`, non-dex entries survive, and a re-patch is detected |
 | `DerReaderTest` | the DER decoder: short/long lengths, multi-byte tag numbers (704–719), integers/enumerated/booleans, nested readers, OID decoding including multi-octet first subidentifiers, and clean failures on truncated or overrunning input |
 | `AttestationParserTest` | a complete synthetic KeyDescription built with `DerFixture`, asserting every verdict input: header fields, RootOfTrust (locked/unlocked, boot state, boot hash, absent hash), patch levels, device identity, `attestationApplicationId`, and that `softwareEnforced` is ignored |
+| `KeyboxVerifierTest` | certificate parsing, chain anchoring and status-list lookup against **real Google attestation roots** (`patcher/src/test/resources/*.pem`): anchors to the right root, rejects an unanchored keybox, and looks a serial up by hex (the documented format) while ignoring decimal keys |
 
-Fixtures are built in-process with `DexFixture` and `DerFixture`, so the dex and DER tests depend on no ROM extraction. A fixture states a signature or a structure exactly — that is the contract being matched on.
+Fixtures are built in-process with `DexFixture` and `DerFixture`, so the dex and DER tests depend on no ROM extraction. A fixture states a signature or a structure exactly — that is the contract being matched on. The keybox fixtures are two genuine Google attestation roots, fetched from `https://android.googleapis.com/attestation/root`.
 
 The app module has no JVM unit tests: AGP needs `androidJdkImage` for `compileDebugJavaWithJavac` even with no Java sources, and that transform fails on JDK 26. Any pure logic worth testing belongs in `:patcher` — which is why `SpoofRules` lives there and only file IO stays in the app.
 

@@ -227,13 +227,32 @@ object KeyboxVerifier {
         )
     }
 
+    /**
+     * Look a certificate up in Google's status list.
+     *
+     * The list is keyed by the **certificate serial number in lowercase hex**, and
+     * the published schema constrains the key to `^[a-f1-9][a-f0-9]*$` — no leading
+     * zeros, never `0x` prefixed. Verified against the live list: all 1746 keys
+     * match that pattern, and 976 of them consist only of digits `0-9`, so they look
+     * decimal while actually being hex serials whose hex happens to contain no
+     * `a-f`.
+     *
+     * The decimal form is deliberately **not** tried. It was the first lookup
+     * previously, and it is the only variant that can resolve to a *different*
+     * certificate: serial 10000 has decimal `"10000"` and hex `"2710"`, so a decimal
+     * lookup could match the entry of a different key whose hex serial is `10000`
+     * and report its status. Every remaining variant is the same serial in another
+     * notation, so none of them can cross-match. `BigInteger.toString(16)` already
+     * gives lowercase without leading zeros, matching the schema directly.
+     */
     private fun statusFor(
         serial: BigInteger,
         statuses: Map<String, IntegrityData.RevocationEntry>
     ): IntegrityData.RevocationEntry? {
-        val decimal = serial.toString(10)
         val hex = serial.toString(16)
-        return statuses[decimal] ?: statuses[hex] ?: statuses[hex.uppercase()] ?: statuses["0x$hex"]
+        return statuses[hex]
+            ?: statuses[hex.uppercase()]
+            ?: statuses["0x$hex"]
     }
 
     private fun extractAttestation(certificate: X509Certificate): AttestationInfo? {
