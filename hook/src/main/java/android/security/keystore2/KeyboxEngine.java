@@ -163,6 +163,8 @@ public final class KeyboxEngine {
             }
             sCachedXml = xml;
             sCachedChain = parsed;
+            // Diagnostics: is the keybox loaded, and has Google revoked it?
+            HookDebug.logKeybox(config);
             return parsed;
         } catch (Throwable throwable) {
             HookLog.e("replaceChain", throwable);

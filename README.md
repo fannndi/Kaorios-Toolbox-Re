@@ -127,7 +127,16 @@ Other Google surfaces, for future ideas (none usable client-side today):
 
 ## 🐞 Debugging on a device (ADB)
 
-Verbose logging is switched on with the platform's own switch, so it needs no rebuild:
+Verbose logging is switched on with the platform's own switch, so it needs no rebuild. `tools/adb-debug.sh` wraps it:
+
+```bash
+./tools/adb-debug.sh            # enable verbose and stream the hook's log
+./tools/adb-debug.sh --dump     # stream only the [farewell] state dump lines
+./tools/adb-debug.sh --status   # is verbose currently on?
+./tools/adb-debug.sh --off      # switch it back off
+```
+
+or by hand:
 
 ```bash
 adb shell setprop log.tag.KeyStoreHooks DEBUG
@@ -146,7 +155,14 @@ That turns on every `HookLog.d(...)` line (it used to be a hardcoded `false`, wh
 [farewell] keybox.revoked=false
 ```
 
-`keybox.chain=-1` / `keybox.leafSerial=unknown` means no keybox has been parsed yet — the usual reason a keybox spoof appears to do nothing. Dumps are emitted once per config change (deduped on the raw blob) and only while verbose is on, so production stays quiet.
+`keybox.chain=-1` / `keybox.leafSerial=unknown` means no keybox has been parsed yet — the usual reason a keybox spoof appears to do nothing.
+
+A dump is emitted at both moments that matter, so switching verbose on mid-session still shows the current state rather than staying silent until something changes:
+
+- when the **config blob changes** (deduped on the raw blob), and
+- when a **new keybox chain is parsed** (deduped on the chain instance).
+
+Both are verbose-gated, so production stays quiet.
 
 ## 🏗️ Modules in detail
 

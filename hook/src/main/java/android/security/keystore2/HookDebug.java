@@ -87,6 +87,7 @@ final class HookDebug {
     }
 
     private static volatile String sLastRaw;
+    private static volatile Certificate[] sLastDumpedChain;
 
     /** Emit a dump when the config blob changes. Verbose-gated, so quiet by default. */
     static void logOnChange(String raw, HookConfig config) {
@@ -95,5 +96,26 @@ final class HookDebug {
         }
         sLastRaw = raw;
         HookLog.d("config changed, state dump:\n" + dump(fromConfig(config)));
+    }
+
+    /**
+     * Dump the keybox state whenever a new chain is parsed.
+     *
+     * [logOnChange] only reacts to config edits, so switching verbose on after the
+     * config was already applied would show nothing until something changed. This
+     * covers the other moment that matters: whether the keybox actually loaded and
+     * whether Google has revoked it. Verbose-gated, and deduped on the chain
+     * instance so a busy key path does not spam logcat.
+     */
+    static void logKeybox(HookConfig config) {
+        if (!HookLog.verbose()) {
+            return;
+        }
+        Certificate[] chain = KeyboxEngine.cachedChain();
+        if (chain == sLastDumpedChain) {
+            return;
+        }
+        sLastDumpedChain = chain;
+        HookLog.d("keybox state dump:\n" + dump(fromConfig(config)));
     }
 }
