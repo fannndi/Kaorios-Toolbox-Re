@@ -309,6 +309,19 @@ The app module has no JVM unit tests: AGP needs `androidJdkImage` for `compileDe
 
 ### Verifying a ROM without a device
 
+One command runs the whole surya compatibility gate — prop proof plus dex
+proof — against the three stock ROM trees (never touches the ROMs themselves):
+
+```powershell
+pwsh -File tools/rom-audit/verify_surya.ps1 `
+  -Miui12Rom C:/ROMs/MIUI12 -Miui13Rom C:/ROMs/MIUI13 -Miui14Rom C:/ROMs/MIUI14 `
+  -JavaHome "C:/Program Files/Java/jdk-26.0.1"
+```
+
+It asserts the exact dex counts (14/6 on MIUI 12, 15/6 on MIUI 13/14, always
+0 skipped — a rule that silently stops firing on a ROM breaks the count) and
+the prop proof below, exiting non-zero on any regression.
+
 The three `tools/rom-audit/` scripts answer, in order: what the ROM contains, who wins each property key, and whether the spoof actually survives. `verify_props.py` drives the real patcher and the real maps against a copy of the ROM tree:
 
 ```bash
