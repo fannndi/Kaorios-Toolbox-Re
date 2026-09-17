@@ -50,8 +50,25 @@ final class KeyboxRevocation {
     private final AtomicLong mLoadedAt = new AtomicLong(0);
     private final AtomicBoolean mRefreshing = new AtomicBoolean(false);
 
+    /**
+     * Test seam: when set, supplies the status JSON instead of the network. The
+     * production path leaves this null and uses the real {@link #fetch(String)}.
+     * Declared as an interface (not a lambda) to honour the hook's Java 11 /
+     * no-lambda rule; tests provide an anonymous implementation.
+     */
+    interface StatusFetcher {
+        String fetch(String url) throws Exception;
+    }
+
+    private StatusFetcher mFetcher;
+
     KeyboxRevocation(File cacheDir) {
         mCacheDir = cacheDir;
+    }
+
+    /** Test-only: replace the network source with a canned one. */
+    void setFetcherForTest(StatusFetcher fetcher) {
+        mFetcher = fetcher;
     }
 
     /**
@@ -98,7 +115,7 @@ final class KeyboxRevocation {
     /** Background fetch + parse + cache. Any failure is swallowed: stay best-effort. */
     void refresh() {
         try {
-            String json = fetch(STATUS_URL);
+            String json = loadStatusJson(STATUS_URL);
             Map<String, String> parsed = parseStatus(json);
             if (parsed != null) {
                 mStatus = parsed;
@@ -110,6 +127,11 @@ final class KeyboxRevocation {
         } finally {
             mRefreshing.set(false);
         }
+    }
+
+    /** The status JSON source. Uses the injected fetcher when present, else the network. */
+    private String loadStatusJson(String url) throws Exception {
+        return mFetcher != null ? mFetcher.fetch(url) : fetch(url);
     }
 
     static Map<String, String> parseStatus(String json) {
