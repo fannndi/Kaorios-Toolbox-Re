@@ -111,18 +111,32 @@ fun PatchScreen(state: PatchUiState, viewModel: MainViewModel, modifier: Modifie
                 Column(Modifier.padding(16.dp)) {
                     Text("No root? Use the seed", fontWeight = FontWeight.Bold)
                     Text(
-                        "The prop files are unreadable without root (SELinux). Flash this seed zip once in TWRP: " +
-                            "it copies the stock files into the app folder, then Build Patch ZIP works rootless.",
+                        "1. Export the restore zip below FIRST - it backs up the originals on the phone, so every " +
+                            "later patch (even after an app update) patches the originals, never the flashed files. " +
+                            "2. Flash the seed zip once in TWRP so the prop files are readable without root.",
                         style = MaterialTheme.typography.bodySmall
                     )
                     Spacer(Modifier.height(8.dp))
+                    OutlinedButton(
+                        onClick = { viewModel.exportStockZip() },
+                        enabled = !state.busy && viewModel.device.supportedDevice,
+                        modifier = Modifier.testTag(UiTags.PATCH_EXPORT_RESTORE)
+                    ) {
+                        Text("1. Backup original (export restore zip)")
+                    }
+                    Spacer(Modifier.height(4.dp))
                     OutlinedButton(
                         onClick = { viewModel.exportSeedZip() },
                         enabled = !state.busy && viewModel.device.supportedDevice,
                         modifier = Modifier.testTag(UiTags.PATCH_EXPORT_SEED)
                     ) {
-                        Text("Export seed zip")
+                        Text("2. Export seed zip (TWRP, once)")
                     }
+                    Text(
+                        "Keep the restore zip off the phone too. The patch flash additionally writes its own backup to " +
+                            "/data/media/0/Farewell/backup-<stamp>/ with a restore.sh.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
                 }
             }
         }

@@ -161,6 +161,35 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun exportStockZip() {
+        viewModelScope.launch {
+            _state.update { it.copy(busy = true, progress = "Building restore zip...") }
+            try {
+                val zip = repository.buildStockZip { message ->
+                    _state.update { current ->
+                        current.copy(progress = message, log = current.log + message)
+                    }
+                }
+                repository.exportToDownloads(zip, zip.name)
+                val stored = repository.storedStockCount()
+                _state.update {
+                    it.copy(
+                        busy = false,
+                        progress = "",
+                        lastBackup = zip,
+                        log = it.log +
+                            "Restore zip exported: ${zip.name} (flash this if the patch does not boot)." +
+                            " $stored original file(s) saved on the phone for future patch builds."
+                    )
+                }
+            } catch (throwable: Throwable) {
+                _state.update {
+                    it.copy(busy = false, progress = "", log = it.log + "Restore build failed: ${throwable.message}")
+                }
+            }
+        }
+    }
+
     fun exportSeedZip() {
         viewModelScope.launch(Dispatchers.IO) {
             _state.update { it.copy(busy = true, progress = "Building seed zip...") }

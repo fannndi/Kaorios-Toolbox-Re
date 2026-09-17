@@ -216,6 +216,24 @@ files patched, `keystore_cfg` embedded — and exported it. Shizuku would not ch
 Android 10: it needs USB re-activation after every reboot there, and the shell UID it grants still
 cannot read `build.prop` or write `/system`.
 
+**Backup-first workflow (recommended, and the only sane order):**
+
+1. **Backup original** — finds the stock files (store first, then seed, then the live system path,
+   then root), saves them under the app's private `files/stock/` (survives app updates) and exports
+   `Farewell-Stock-<profile>-<stamp>.zip`. **Keep that zip off the phone.**
+2. **Seed once** — flash `Farewell-Seed-<profile>.zip` in TWRP so the prop files are readable
+   without root.
+3. **Build the patch** — `Farewell-Patch-<profile>-<stamp>.zip` patches the *saved originals*,
+   never the flashed system files, so after an app update (new hook, new config) you just rebuild
+   and re-flash; no need to restore first.
+4. **If it does not boot** — flash the exported restore zip, or use
+   `/data/media/0/Farewell/backup-<stamp>/restore.sh` written by the patch flash itself.
+
+Safety rails: a restore zip is **refused** when every source of a jar is already patched (a
+"stock" zip built from patched files would restore the patch — the exact thing you would need it
+not to do), and the patch build marks such a source so it never fabricates one silently. When the
+store exists, the restore zip is built from it and is verified to contain no hook class.
+
 ## 🏗️ Modules in detail
 
 ### `app/` — Farewell Toolbox APK

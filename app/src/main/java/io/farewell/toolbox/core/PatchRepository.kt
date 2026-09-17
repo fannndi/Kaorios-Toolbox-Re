@@ -49,6 +49,21 @@ class PatchRepository(private val context: Context) {
     val seedDir: File
         get() = File(context.getExternalFilesDir(null), "seed")
 
+    /**
+     * Persistent copy of the stock files, saved by the backup action.
+     *
+     * The workflow this enables: back up the original once, then every later
+     * build — including after an app update with a new hook — patches *these*
+     * files, never the (possibly already patched) system ones. Internal storage,
+     * so it survives app updates; a written copy also lives in the restore zip.
+     */
+    private val stockStore: File
+        get() = File(context.filesDir, "stock").apply { mkdirs() }
+
+    private fun storeFile(systemPath: String): File = File(stockStore, systemPath.replace('/', '_'))
+
+    fun storedStockCount(): Int = stockStore.listFiles()?.count { it.isFile } ?: 0
+
     fun seedFileCount(): Int {
         val dir = seedDir
         if (!dir.exists()) return 0
@@ -58,46 +73,61 @@ class PatchRepository(private val context: Context) {
     suspend fun detectStatus(): PatchStatus = withContext(Dispatchers.IO) {
         val probe = File(workDir, "installed-framework.jar")
         probe.delete()
-        val source = pullFromSources("system/framework/framework.jar", probe)
+        val source = pullFromSources("system/framework/framework.jar", probe, preferUnpatched = false)
             ?: return@withContext PatchStatus(
                 RootShell.isRootAvailable(), false, null,
                 "Could not read framework.jar (no root, no seed); export and flash the seed zip first",
                 device.profile.id
             )
-        val containsHook = containsAscii(probe, MARKER_CLASS.toByteArray(Charsets.US_ASCII))
+        val containsHook = source.patched
         val version = readVersion(probe)
         probe.delete()
+        val store = if (storedStockCount() > 0) ", backup: ${storedStockCount()} files" else ""
         if (containsHook) {
-            PatchStatus(RootShell.isRootAvailable(), true, version, "Farewell patch installed ($source)", device.profile.id)
+            PatchStatus(RootShell.isRootAvailable(), true, version, "Farewell patch installed (${source.label})$store", device.profile.id)
         } else {
-            PatchStatus(RootShell.isRootAvailable(), false, null, "Stock framework detected ($source)", device.profile.id)
+            PatchStatus(RootShell.isRootAvailable(), false, null, "Stock framework detected (${source.label})$store", device.profile.id)
         }
     }
 
     /**
      * Reads one stock file without requiring root when possible.
      *
-     * Order: the live system path (readable for the framework jars as the app
-     * uid — verified on a stock surya), then the TWRP seed copy, then `su cat`
-     * for a rooted device. Returns a human-readable source label, or null.
+     * Order: the saved original (stock store), the TWRP seed, the live system
+     * path, then `su cat`. With [preferUnpatched] an already-patched copy is
+     * skipped and only used when nothing unpatched exists — that keeps a
+     * restore artifact honest even on a device that is already flashed.
      */
-    private fun pullFromSources(systemPath: String, dest: File): String? {
-        val direct = File("/$systemPath")
-        if (readInto(direct, dest)) {
-            return "direct"
-        }
-        val seed = File(seedDir, systemPath)
-        if (readInto(seed, dest)) {
-            return "seed"
+    private data class StockSource(val label: String, val patched: Boolean)
+
+    private fun pullFromSources(systemPath: String, dest: File, preferUnpatched: Boolean = true): StockSource? {
+        var patchedFallback: StockSource? = null
+        val candidates = listOf(
+            storeFile(systemPath) to "stock store",
+            File(seedDir, systemPath) to "seed",
+            File("/$systemPath") to "direct"
+        )
+        for ((file, label) in candidates) {
+            if (!readInto(file, dest)) continue
+            val patched = containsAscii(dest, MARKER_CLASS.toByteArray(Charsets.US_ASCII))
+            if (patched && preferUnpatched) {
+                if (patchedFallback == null) patchedFallback = StockSource(label, true)
+                continue
+            }
+            return StockSource(label, patched)
         }
         if (RootShell.isRootAvailable()) {
             val pull = RootShell.copyToFile(catCommand(systemPath), dest, timeoutSeconds = 600)
             if (pull.code == 0 && dest.length() > 0L) {
-                return "root"
+                val patched = containsAscii(dest, MARKER_CLASS.toByteArray(Charsets.US_ASCII))
+                if (!(patched && preferUnpatched)) {
+                    return StockSource("root", patched)
+                }
+                if (patchedFallback == null) patchedFallback = StockSource("root", true)
             }
         }
         dest.delete()
-        return null
+        return patchedFallback
     }
 
     private fun readInto(source: File, dest: File): Boolean {
@@ -141,6 +171,7 @@ class PatchRepository(private val context: Context) {
 
         val patchedFiles = LinkedHashMap<String, File>()
         val stockFiles = LinkedHashMap<String, File>()
+        var alreadyPatched = false
         val nativeProps = if (device.supportedDevice) {
             PlayIntegritySetup.buildNativePropMap(context)
         } else {
@@ -194,7 +225,15 @@ class PatchRepository(private val context: Context) {
                 step("  not present, skipped")
                 continue
             }
-            step("  source: $source (${stockFile.length() / 1024} KB)")
+            step("  source: ${source.label} (${stockFile.length() / 1024} KB)")
+            if (source.patched) {
+                // Every source was already patched. Patching again is harmless
+                // (the engine detects the injected dex), but a restore zip built
+                // from this would restore the *patch* — so it is skipped below.
+                alreadyPatched = true
+            } else {
+                persistStock(target.systemPath, stockFile)
+            }
             stockFiles[target.zipPath] = stockFile
 
             val patchedFile = File(workDir, "${target.kind.name.lowercase()}-patched-$name")
@@ -253,17 +292,108 @@ class PatchRepository(private val context: Context) {
         patchTemplate.putAll(patchExtras)
         FlashZipBuilder.build(patchZip, patchTemplate, patchedFiles)
 
-        val backupZip = File(workDir, "Farewell-Stock-${device.profile.id}-$stamp.zip")
-        val stockExtras = mapOf(
-            "system_root/system/framework/keystore.patch" to "stock $stamp\n".toByteArray(Charsets.UTF_8)
-        )
-        val stockTemplate = templateEntries(stamp, restore = true, payload = stockFiles.keys, extras = stockExtras.keys)
-        stockTemplate.putAll(stockExtras)
-        FlashZipBuilder.build(backupZip, stockTemplate, stockFiles)
+        val backupZip: File?
+        if (alreadyPatched) {
+            // Refuse to fabricate a "stock" zip out of already-patched files:
+            // flashing it would leave the device exactly as patched as before,
+            // which is the worst possible thing to hand someone in a bootloop.
+            backupZip = null
+            step("Restore zip SKIPPED: the source jars are already patched.")
+            step("  Use /data/media/0/Farewell/backup-*/restore.sh (from the first patch flash),")
+            step("  or flash the stock ROM, to get a real restore.")
+        } else {
+            backupZip = File(workDir, "Farewell-Stock-${device.profile.id}-$stamp.zip")
+            val stockExtras = mapOf(
+                "system_root/system/framework/keystore.patch" to "stock $stamp\n".toByteArray(Charsets.UTF_8)
+            )
+            val stockTemplate = templateEntries(stamp, restore = true, payload = stockFiles.keys, extras = stockExtras.keys)
+            stockTemplate.putAll(stockExtras)
+            FlashZipBuilder.build(backupZip, stockTemplate, stockFiles)
+            step("Restore zip: ${backupZip.name}")
+        }
 
-        step("Restore zip: ${backupZip.name}")
         step("Done")
         BuildResult(patchZip, backupZip, report.toString())
+    }
+
+    /**
+     * Keeps an unpatched copy in the app's own store so later builds patch the
+     * original even after the system files were flashed.
+     */
+    private fun persistStock(systemPath: String, file: File) {
+        try {
+            val target = storeFile(systemPath)
+            if (target.exists() && target.length() == file.length()) return
+            file.inputStream().use { input ->
+                target.outputStream().use { output -> input.copyTo(output) }
+            }
+        } catch (throwable: Throwable) {
+            // Best-effort: a failed store write must not fail the build.
+        }
+    }
+
+    /**
+     * Builds the restore zip from unpatched sources and keeps a copy of every
+     * original in the app's stock store.
+     *
+     * This is the artifact to hand someone *before* flashing the patch: the
+     * patch zip's own flash-time backup can only run once TWRP is up, so having
+     * this on external storage is what makes "if it does not boot, flash the
+     * backup" true. Once the store has the originals, later builds (including
+     * after an app update that ships a new hook) patch those files instead of
+     * the already-flashed system ones. Refuses to build when a source jar is
+     * already patched — a restore zip from patched files would not restore
+     * anything.
+     */
+    suspend fun buildStockZip(onProgress: (String) -> Unit): File = withContext(Dispatchers.IO) {
+        check(device.supportedDevice) {
+            "Unsupported device: ${device.device} / ${device.model}. Farewell patch targets surya only."
+        }
+        val stamp = SimpleDateFormat("yyyyMMdd-HHmm", Locale.US).format(Date())
+        val stockFiles = LinkedHashMap<String, File>()
+        val targets = LinkedHashMap<String, PatchTarget>()
+        for (target in device.profile.targets) {
+            targets[target.systemPath] = target
+        }
+        for (target in PlatformProfiles.skuPropTargets(device.hardwareSku)) {
+            if (!targets.containsKey(target.systemPath)) {
+                targets[target.systemPath] = target
+            }
+        }
+        for (target in targets.values) {
+            val stockFile = File(workDir, "restore-stock-${target.systemPath.replace('/', '_')}")
+            stockFile.delete()
+            val source = pullFromSources(target.systemPath, stockFile)
+            if (source == null) {
+                if (target.required) {
+                    error(
+                        "Could not read /${target.systemPath}: no root, and no seed copy. " +
+                            "Flash Farewell-Seed-<profile>.zip in TWRP once, then try again."
+                    )
+                }
+                onProgress("  ${target.systemPath}: not present, skipped")
+                continue
+            }
+            if (source.patched) {
+                error(
+                    "/${target.systemPath} is already patched everywhere (store, seed, system), so a restore zip " +
+                        "built from it would NOT restore the stock ROM. Real restores come from " +
+                        "/data/media/0/Farewell/backup-*/restore.sh (written by the first patch flash), or from " +
+                        "flashing the stock ROM."
+                )
+            }
+            persistStock(target.systemPath, stockFile)
+            onProgress("  ${target.systemPath}: ${source.label}")
+            stockFiles[target.zipPath] = stockFile
+        }
+        val zip = File(workDir, "Farewell-Stock-${device.profile.id}-$stamp.zip")
+        val extras = mapOf(
+            "system_root/system/framework/keystore.patch" to "stock $stamp\n".toByteArray(Charsets.UTF_8)
+        )
+        val template = templateEntries(stamp, restore = true, payload = stockFiles.keys, extras = extras.keys)
+        template.putAll(extras)
+        FlashZipBuilder.build(zip, template, stockFiles)
+        zip
     }
 
     /**
