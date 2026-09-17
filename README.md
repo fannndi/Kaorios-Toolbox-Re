@@ -204,13 +204,14 @@ Requirements: **JDK 17+**, Android SDK (platform 37, build-tools 36/37), Android
 ./gradlew :app:assembleDebug                        # build the APK (also builds hook.dex)
 ./gradlew -PrenewHookIdentity :app:assembleDebug    # rotate the per-build hook identity
 ./gradlew -PhookObfuscate=false :app:assembleDebug  # plain-D8 hook dex for debugging
-./gradlew :patcher:test                             # unit tests (pure JVM, no device needed)
+./gradlew :patcher:test                             # patcher unit tests (pure JVM, no device needed)
+./gradlew :hook:test                               # hook DER/attestation builder tests (JVM 17)
 pwsh -File native/build.ps1                         # build farewelld (arm64-v8a)
 ```
 
 ### Tests
 
-`./gradlew :patcher:test` runs the suite in `patcher/src/test/` — no device or ROM required:
+`./gradlew :patcher:test` and `./gradlew :hook:test` run the suites in `patcher/src/test/` and `hook/src/test/` — no device or ROM required:
 
 | Class | Covers |
 |---|---|
@@ -225,9 +226,16 @@ pwsh -File native/build.ps1                         # build farewelld (arm64-v8a
 | `FlashZipBuilderTest` | the flashable zip: template and payload entries, binary payloads preserved byte for byte, LF-only scripts untouched, and the entry-name contract the shell installer depends on (`system_root/...` for system, native paths for the other partitions, first path segment = mount point) |
 | `IntegrityDataTest` | the Google cache and parsing: the 24-hour max-age, roots from a JSON array, statuses from `entries` with optional `reason`/`comment`/`expires`, entries without a `status` skipped, and malformed JSON yielding empty results instead of throwing |
 
+The `:hook` tests run the device-side DER/attestation builders on the JVM and round-trip them through the tooling-side `AttestationParser`, so the encoder the hook ships and the parser the desktop tool reads are covered by one contract (the hook test source set compiles at JVM 17 because it consumes `:patcher`, which is JVM 17; the hook device code stays at Java 11):
+
+| Class | Covers |
+|---|---|
+| `DerTest` | `Der.oid` — the high-tag base-128 encoding bug: a single-byte write silently truncated any OID whose leading value reached 128 (e.g. `2.48.x`), so round-trips are asserted through the tooling `DerReader.oid`, plus multi-octet arcs (`2.999.5`) |
+| `AttestationBuilderTest` | `AttestationBuilder.build` produces a real X.509 cert the tooling `AttestationParser` reads back exactly: brand/device/product/manufacturer/model, patch levels (706/718/719), RootOfTrust (locked, boot state, boot hash), challenge length, and `attestationApplicationId`; the cert also verifies against the keybox key that signed it |
+
 Fixtures are built in-process with `DexFixture` and `DerFixture`, so the dex and DER tests depend on no ROM extraction. A fixture states a signature or a structure exactly — that is the contract being matched on. The keybox fixtures are two genuine Google attestation roots, fetched from `https://android.googleapis.com/attestation/root`.
 
-The app module has no JVM unit tests: AGP needs `androidJdkImage` for `compileDebugJavaWithJavac` even with no Java sources, and that transform fails on JDK 26. Any pure logic worth testing belongs in `:patcher` — which is why `SpoofRules` lives there and only file IO stays in the app.
+The app module has no JVM unit tests: AGP needs `androidJdkImage` for `compileDebugJavaWithJavac` even with no Java sources, and that transform fails on JDK 26. The `:hook` module's pure-Java DER/attestation builders do run on the JVM, so their tests live there and round-trip through `:patcher`'s parser; any other pure logic worth testing belongs in `:patcher` — which is why `SpoofRules` lives there and only file IO stays in the app.
 
 ### Patcher CLI
 

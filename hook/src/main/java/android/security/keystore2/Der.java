@@ -127,21 +127,30 @@ final class Der {
     static byte[] oid(String dotted) {
         String[] parts = dotted.split("\\.");
         ByteArrayOutputStream out = new ByteArrayOutputStream();
-        out.write(Integer.parseInt(parts[0]) * 40 + Integer.parseInt(parts[1]));
+        // The first subidentifier is 40 * arc0 + arc1 encoded as a base-128 value,
+        // so it needs the same varint form as the later arcs. Writing it as a single
+        // byte silently truncates anything at or above 128: "2.999" encodes as 1079
+        // and would be written as 55, producing a different, wrong OID.
+        writeBase128(out, Integer.parseInt(parts[0]) * 40 + Integer.parseInt(parts[1]));
         for (int i = 2; i < parts.length; i++) {
-            long value = Long.parseLong(parts[i]);
-            int shift = 28;
-            boolean started = false;
-            while (shift >= 0) {
-                int chunk = (int) ((value >> shift) & 0x7F);
-                if (chunk != 0 || started || shift == 0) {
-                    started = true;
-                    out.write(chunk | (shift == 0 ? 0 : 0x80));
-                }
-                shift -= 7;
-            }
+            writeBase128(out, Long.parseLong(parts[i]));
         }
         return tlv(0x06, out.toByteArray());
+    }
+
+    /** Minimal base-128 encoding, high bit set on every octet but the last. */
+    private static void writeBase128(ByteArrayOutputStream out, long value) {
+        if (value < 0) {
+            throw new IllegalArgumentException("OID arc must not be negative: " + value);
+        }
+        int shift = 0;
+        while ((value >>> (shift + 7)) != 0) {
+            shift += 7;
+        }
+        for (; shift >= 0; shift -= 7) {
+            int chunk = (int) ((value >>> shift) & 0x7F);
+            out.write(chunk | (shift == 0 ? 0 : 0x80));
+        }
     }
 
     static byte[] utcTime(long millis) {

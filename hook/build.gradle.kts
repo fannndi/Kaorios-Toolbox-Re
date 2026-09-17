@@ -1,8 +1,11 @@
 import org.gradle.process.CommandLineArgumentProvider
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import java.util.Properties
 
 plugins {
     `java-library`
+    kotlin("jvm")
 }
 
 val localProps = Properties().apply {
@@ -29,11 +32,38 @@ java {
     targetCompatibility = JavaVersion.VERSION_11
 }
 
+// The device code stays at Java 11 (compileOnly android.jar, no lambdas/streams),
+// but the test source set consumes :patcher, which is JVM 17. Compile only the
+// tests at 17 so the cross-module dependency resolves; runtime is JDK 26.
+tasks.withType<JavaCompile>().configureEach {
+    if (name.startsWith("compileTest")) {
+        sourceCompatibility = "17"
+        targetCompatibility = "17"
+    }
+}
+tasks.withType<KotlinCompile>().configureEach {
+    if (name.startsWith("compileTest")) {
+        compilerOptions.jvmTarget.set(JvmTarget.JVM_17)
+    }
+}
+
 dependencies {
     compileOnly(files(androidJar))
+
+    // Unit tests run on the JVM. Der and AttestationBuilder are plain Java, but the
+    // module's classes reference android types, so android.jar is needed on the test
+    // compile classpath as well. :patcher is needed to round-trip what the hook
+    // writes back through the parser the tooling reads it with.
+    testImplementation(libs.junit)
+    testImplementation(files(androidJar))
+    testImplementation(project(":patcher"))
 }
 
 tasks.named("compileJava") {
+    dependsOn(":generateHookIdentity")
+}
+
+tasks.named("compileKotlin") {
     dependsOn(":generateHookIdentity")
 }
 
