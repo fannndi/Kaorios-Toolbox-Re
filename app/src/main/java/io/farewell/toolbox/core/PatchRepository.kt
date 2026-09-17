@@ -397,6 +397,41 @@ class PatchRepository(private val context: Context) {
     }
 
     /**
+     * Installs this APK as a privileged system app, once.
+     *
+     * A separate zip on purpose: the APK is ~33 MB, so bundling it into every
+     * patch zip would triple the size for a one-time step. Flashed to
+     * `/system/priv-app`, the app gains `REBOOT` (reboot / reboot to recovery
+     * with no root) and `WRITE_SECURE_SETTINGS` (config writes with no root),
+     * both listed in the allowlist that ships next to it because MIUI runs
+     * `ro.control_privapp_permissions=enforce`.
+     */
+    fun buildPrivilegedZip(): File {
+        val stamp = SimpleDateFormat("yyyyMMdd-HHmm", Locale.US).format(Date())
+        val zip = File(workDir, "Farewell-SystemApp-$stamp.zip")
+        val apk = File(context.applicationInfo.sourceDir)
+        check(apk.exists() && apk.length() > 0L) { "Cannot read this APK (${apk.absolutePath})" }
+        val extras = mapOf(
+            "system_root/system/etc/permissions/privapp-permissions-io.farewell.toolbox.xml" to
+                context.assets.open("zip/privapp-permissions-io.farewell.toolbox.xml").use { it.readBytes() },
+            "system_root/system/framework/keystore.patch" to "sysapp $stamp\n".toByteArray(Charsets.UTF_8)
+        )
+        val template = templateEntries(
+            stamp,
+            restore = false,
+            payload = listOf("system_root/system/priv-app/FarewellToolbox/FarewellToolbox.apk"),
+            extras = extras.keys
+        )
+        template.putAll(extras)
+        FlashZipBuilder.build(
+            zip,
+            template,
+            mapOf("system_root/system/priv-app/FarewellToolbox/FarewellToolbox.apk" to apk)
+        )
+        return zip
+    }
+
+    /**
      * The seed zip: a tiny TWRP flashable that copies the stock files the app
      * cannot read (build.prop family) into the app's external files dir. After
      * one seed flash, every build works with no root.

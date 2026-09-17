@@ -132,9 +132,18 @@ fun PatchScreen(state: PatchUiState, viewModel: MainViewModel, modifier: Modifie
                     ) {
                         Text("2. Export seed zip (TWRP, once)")
                     }
+                    Spacer(Modifier.height(4.dp))
+                    OutlinedButton(
+                        onClick = { viewModel.exportPrivilegedZip() },
+                        enabled = !state.busy && viewModel.device.supportedDevice,
+                        modifier = Modifier.testTag(UiTags.PATCH_EXPORT_SYSAPP)
+                    ) {
+                        Text("3. Export system-app zip (TWRP, once)")
+                    }
                     Text(
-                        "Keep the restore zip off the phone too. The patch flash additionally writes its own backup to " +
-                            "/data/media/0/Farewell/backup-<stamp>/ with a restore.sh.",
+                        "Optional but recommended: flash the system-app zip once and the app gains " +
+                            "reboot-to-recovery and rootless config writes. Keep the restore zip off the phone too. " +
+                            "The patch flash additionally writes its own backup to /data/media/0/Farewell/backup-<stamp>/ with a restore.sh.",
                         style = MaterialTheme.typography.bodySmall
                     )
                 }
@@ -201,11 +210,19 @@ fun PatchScreen(state: PatchUiState, viewModel: MainViewModel, modifier: Modifie
         }
 
         item {
-            OutlinedButton(
-                onClick = { viewModel.reboot() },
-                modifier = Modifier.testTag(UiTags.PATCH_REBOOT)
-            ) {
-                Text("Reboot device")
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(
+                    onClick = { viewModel.reboot() },
+                    modifier = Modifier.testTag(UiTags.PATCH_REBOOT)
+                ) {
+                    Text("Reboot")
+                }
+                OutlinedButton(
+                    onClick = { viewModel.rebootToRecovery() },
+                    modifier = Modifier.testTag(UiTags.PATCH_REBOOT_RECOVERY)
+                ) {
+                    Text("Reboot to recovery")
+                }
             }
         }
     }

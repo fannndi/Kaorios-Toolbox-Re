@@ -34,7 +34,9 @@ object UiTags {
     const val PATCH_EXPORT_BACKUP = "patch.export.backup"
     const val PATCH_EXPORT_SEED = "patch.export.seed"
     const val PATCH_EXPORT_RESTORE = "patch.export.restore"
+    const val PATCH_EXPORT_SYSAPP = "patch.export.sysapp"
     const val PATCH_REBOOT = "patch.reboot"
+    const val PATCH_REBOOT_RECOVERY = "patch.reboot.recovery"
 
     // Patch screen — readable state (drive the flow, then read these).
     const val PATCH_STATUS = "patch.status"

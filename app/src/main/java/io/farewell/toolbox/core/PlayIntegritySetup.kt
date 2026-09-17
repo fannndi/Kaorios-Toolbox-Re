@@ -51,12 +51,12 @@ object PlayIntegritySetup {
 
         val rules = SpoofRulesStore.load(context)
         val json = buildConfig(pif, flags, keybox != null, rules)
-        val configWrite = writeSetting("sys_keystore_cfg", json)
+        val configWrite = writeSetting(context, "sys_keystore_cfg", json)
         if (configWrite.code != 0) {
             return@withContext PlayIntegrityResult(false, "Failed to write config: ${configWrite.output.trim()}")
         }
         if (keybox != null) {
-            val keyboxWrite = writeSetting("sys_keybox_cfg", keybox)
+            val keyboxWrite = writeSetting(context, "sys_keybox_cfg", keybox)
             if (keyboxWrite.code != 0) {
                 return@withContext PlayIntegrityResult(false, "Config saved, keybox failed: ${keyboxWrite.output.trim()}")
             }
@@ -140,7 +140,7 @@ object PlayIntegritySetup {
         val chosen = files[index]
         activeKeyboxFile(context).writeText(chosen.readText())
         File(context.filesDir, KEYBOX_INDEX).writeText(index.toString())
-        val write = writeSetting("sys_keybox_cfg", chosen.readText())
+        val write = writeSetting(context, "sys_keybox_cfg", chosen.readText())
         return write.code == 0
     }
 
@@ -372,8 +372,24 @@ object PlayIntegritySetup {
         return root.toString()
     }
 
-    private fun writeSetting(key: String, value: String): ShellResult {
-        val escaped = Codec.encode(value).replace("'", "'\\''")
+    private fun writeSetting(context: Context, key: String, value: String): ShellResult {
+        val encoded = Codec.encode(value)
+        // Rootless path first: a privileged install (the patch zip puts this APK
+        // in /system/priv-app with WRITE_SECURE_SETTINGS in the allowlist) can
+        // write Settings.Global directly, no shell involved.
+        val app = context.applicationContext as? android.app.Application
+        if (app != null &&
+            app.checkSelfPermission(android.Manifest.permission.WRITE_SECURE_SETTINGS) ==
+            android.content.pm.PackageManager.PERMISSION_GRANTED
+        ) {
+            return try {
+                android.provider.Settings.Global.putString(context.contentResolver, key, encoded)
+                ShellResult(0, "settings written directly")
+            } catch (throwable: Throwable) {
+                ShellResult(1, throwable.message ?: "direct settings write failed")
+            }
+        }
+        val escaped = encoded.replace("'", "'\\''")
         return RootShell.run("settings put global $key '$escaped'", timeoutSeconds = 120)
     }
 

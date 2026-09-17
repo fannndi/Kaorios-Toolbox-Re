@@ -223,11 +223,20 @@ cannot read `build.prop` or write `/system`.
    `Farewell-Stock-<profile>-<stamp>.zip`. **Keep that zip off the phone.**
 2. **Seed once** — flash `Farewell-Seed-<profile>.zip` in TWRP so the prop files are readable
    without root.
-3. **Build the patch** — `Farewell-Patch-<profile>-<stamp>.zip` patches the *saved originals*,
+3. **System app once (optional, recommended)** — flash `Farewell-SystemApp-<stamp>.zip`: it installs
+   this APK into `/system/priv-app` plus its allowlist, which grants `REBOOT` (the **Reboot to
+   recovery** button works with no root) and `WRITE_SECURE_SETTINGS` (Apply Play Integrity setup
+   writes the config blobs directly, no root, no adb).
+4. **Build the patch** — `Farewell-Patch-<profile>-<stamp>.zip` patches the *saved originals*,
    never the flashed system files, so after an app update (new hook, new config) you just rebuild
    and re-flash; no need to restore first.
-4. **If it does not boot** — flash the exported restore zip, or use
+5. **If it does not boot** — flash the exported restore zip, or use
    `/data/media/0/Farewell/backup-<stamp>/restore.sh` written by the patch flash itself.
+
+The device runs `ro.control_privapp_permissions=enforce`, so **every privileged permission the
+manifest declares must be listed in `app/src/main/assets/zip/privapp-permissions-io.farewell.toolbox.xml`**
+or the platform refuses to boot the package — keep those two files in sync (they currently declare
+`REBOOT` and `WRITE_SECURE_SETTINGS` on top of the normal permissions).
 
 Safety rails: a restore zip is **refused** when every source of a jar is already patched (a
 "stock" zip built from patched files would restore the patch — the exact thing you would need it

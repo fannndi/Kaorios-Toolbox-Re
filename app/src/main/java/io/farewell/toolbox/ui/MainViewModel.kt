@@ -190,6 +190,29 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun exportPrivilegedZip() {
+        viewModelScope.launch(Dispatchers.IO) {
+            _state.update { it.copy(busy = true, progress = "Building system-app zip...") }
+            try {
+                val zip = repository.buildPrivilegedZip()
+                repository.exportToDownloads(zip, zip.name)
+                _state.update {
+                    it.copy(
+                        busy = false,
+                        progress = "",
+                        log = it.log +
+                            "System-app zip exported: ${zip.name}. Flash it once (TWRP): the app becomes privileged, " +
+                            "so Reboot to recovery and Apply setup work with no root."
+                    )
+                }
+            } catch (throwable: Throwable) {
+                _state.update {
+                    it.copy(busy = false, progress = "", log = it.log + "System-app zip failed: ${throwable.message}")
+                }
+            }
+        }
+    }
+
     fun exportSeedZip() {
         viewModelScope.launch(Dispatchers.IO) {
             _state.update { it.copy(busy = true, progress = "Building seed zip...") }
@@ -415,8 +438,45 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun reboot() {
+        rebootTo(null)
+    }
+
+    fun rebootToRecovery() {
+        rebootTo("recovery")
+    }
+
+    /**
+     * Reboots without root when this build was flashed as a privileged app
+     * (`REBOOT` from the privapp allowlist), and falls back to `su`, then to
+     * guidance. `target` null = normal reboot, "recovery" = recovery.
+     */
+    private fun rebootTo(target: String?) {
         viewModelScope.launch(Dispatchers.IO) {
-            RootShell.run("reboot")
+            val app = getApplication<android.app.Application>()
+            val permitted = app.checkSelfPermission(android.Manifest.permission.REBOOT) ==
+                android.content.pm.PackageManager.PERMISSION_GRANTED
+            if (permitted) {
+                try {
+                    val power = app.getSystemService(android.content.Context.POWER_SERVICE) as android.os.PowerManager
+                    if (target != null) {
+                        power.reboot(target)
+                    } else {
+                        power.reboot(null)
+                    }
+                    return@launch
+                } catch (throwable: Throwable) {
+                    _state.update { it.copy(log = it.log + "PowerManager reboot failed: ${throwable.message}") }
+                }
+            }
+            val result = if (target != null) RootShell.run("reboot $target") else RootShell.run("reboot")
+            if (result.code != 0) {
+                val hint = if (target != null) {
+                    "No REBOOT permission and no root. From a PC: adb reboot recovery"
+                } else {
+                    "No REBOOT permission and no root. From a PC: adb reboot"
+                }
+                _state.update { it.copy(log = it.log + hint) }
+            }
         }
     }
 }
