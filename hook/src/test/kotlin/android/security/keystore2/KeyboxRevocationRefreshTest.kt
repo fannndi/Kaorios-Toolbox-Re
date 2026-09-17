@@ -69,13 +69,13 @@ class KeyboxRevocationRefreshTest {
 
         rev.ensureFresh()
 
-        // The background thread must flip the synchronous check to true and persist the list.
-        assertTrue(
-            "background refresh should load the revoked status into the map",
-            waitUntil(2000) { rev.isRevoked(arrayOf(leaf)) }
-        )
+        // The background thread must flip the synchronous check to true AND persist the list.
+        // Poll for both so we don't race the in-thread saveToDisk that runs after mStatus is set.
         val cacheFile = File(cacheDir, "keybox-revocation.json")
-        assertTrue("a successful refresh must write the cache file", cacheFile.exists())
+        assertTrue(
+            "background refresh should load the revoked status and write the cache file",
+            waitUntil(2000) { rev.isRevoked(arrayOf(leaf)) && cacheFile.exists() }
+        )
         assertTrue("cached payload must contain the revoked serial", cacheFile.readText().contains(serial))
     }
 

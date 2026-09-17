@@ -9,7 +9,25 @@ public final class HookCodec {
 
     private static final String PREFIX = "k2:";
 
+    /**
+     * Test seam: supplies the Base64 decoder. The production path leaves this null
+     * and uses android.util.Base64 (which is a stub that throws under the JVM test
+     * runtime), so tests inject the real java.util.Base64 to exercise decode()
+     * off-device. Declared as an interface, not a lambda, to honour the hook's
+     * Java 11 / no-lambda rule.
+     */
+    interface Decoder {
+        byte[] decode(String s) throws Exception;
+    }
+
+    private static Decoder sDecoder;
+
     private HookCodec() {
+    }
+
+    /** Test-only: replace the Base64 decoder with a canned one. */
+    static void setDecoderForTest(Decoder decoder) {
+        sDecoder = decoder;
     }
 
     public static String decode(String raw) {
@@ -17,7 +35,7 @@ public final class HookCodec {
             return raw;
         }
         try {
-            byte[] data = android.util.Base64.decode(raw.substring(PREFIX.length()), android.util.Base64.DEFAULT);
+            byte[] data = decodeBase64(raw.substring(PREFIX.length()));
             for (int i = 0; i < data.length; i++) {
                 data[i] = (byte) (data[i] ^ KEY[i % KEY.length]);
             }
@@ -26,5 +44,10 @@ public final class HookCodec {
             HookLog.e("codec decode", throwable);
             return raw;
         }
+    }
+
+    /** The Base64 decoder. Uses the injected decoder when present, else android.util.Base64. */
+    private static byte[] decodeBase64(String s) throws Exception {
+        return sDecoder != null ? sDecoder.decode(s) : android.util.Base64.decode(s, android.util.Base64.DEFAULT);
     }
 }
