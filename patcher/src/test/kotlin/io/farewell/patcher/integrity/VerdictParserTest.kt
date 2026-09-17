@@ -172,4 +172,39 @@ class VerdictParserTest {
         ).joinToString("\n")
         assertTrue(unknown.contains("UNKNOWN"))
     }
+
+    @Test
+    fun clearedVerdictsFromTokenReuseAreDiagnosedAsReplay() {
+        // Documented replay protection: decrypting the same token twice clears
+        // the device verdict and sets app/licensing to UNEVALUATED — which looks
+        // exactly like a failed spoof unless the summary says otherwise.
+        val summary = VerdictParser.summarize(
+            VerdictParser.parse(
+                """{"deviceIntegrity": {},
+                    "appIntegrity": {"appRecognitionVerdict": "UNEVALUATED"},
+                    "accountDetails": {"appLicensingVerdict": "UNEVALUATED"}}"""
+            )!!
+        ).joinToString("\n")
+        assertTrue(summary.contains("decrypted more than once"))
+        assertTrue(summary.contains("FRESH token"))
+    }
+
+    @Test
+    fun missingStrongCanMeanNeverOptedIn() {
+        val summary = VerdictParser.summarize(
+            VerdictParser.parse(
+                """{"deviceIntegrity": {"deviceRecognitionVerdict": ["MEETS_BASIC_INTEGRITY", "MEETS_DEVICE_INTEGRITY"]}}"""
+            )!!
+        ).joinToString("\n")
+        assertTrue(summary.contains("opted in"))
+    }
+
+    @Test
+    fun rawEncryptedTokensAreDetectedNotParsed() {
+        // JWE compact serialization: 5 dot-separated base64url segments.
+        assertTrue(VerdictParser.looksLikeRawToken("eyJo.DU4.7Lx.Q2m.zX8"))
+        assertFalse("verdict JSON is not a raw token", VerdictParser.looksLikeRawToken(strongJson()))
+        assertFalse("blank is not a raw token", VerdictParser.looksLikeRawToken("   "))
+        assertNull("and it must not parse as JSON either", VerdictParser.parse("eyJo.DU4.7Lx.Q2m.zX8"))
+    }
 }

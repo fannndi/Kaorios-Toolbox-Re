@@ -98,10 +98,21 @@ fun main(args: Array<String>) {
     }
 
     if (decodeVerdict != null) {
-        // The raw integrity token is encrypted and only Google's server can open
-        // it (Cloud project + OAuth). This reads the *decrypted* verdict JSON
-        // returned by v1.decodeIntegrityToken and answers "did my spoof pass?".
-        val verdict = VerdictParser.parse(decodeVerdict.readText())
+        // The raw integrity token is encrypted (JWE compact serialization) and
+        // only Google's server can open it (Cloud project + OAuth, POST
+        // https://playintegrity.googleapis.com/v1/PACKAGE:decodeIntegrityToken).
+        // This reads the *decrypted* verdict JSON and answers "did my spoof pass?".
+        val pasted = decodeVerdict.readText()
+        if (VerdictParser.looksLikeRawToken(pasted)) {
+            println("That is a RAW encrypted token, not the decrypted verdict - only Google's server can open it:")
+            println("  1. Create a service account with the playintegrity scope on your Google Cloud project.")
+            println("  2. Decrypt it: POST https://playintegrity.googleapis.com/v1/PACKAGE_NAME:decodeIntegrityToken")
+            println("     body { \"integrityToken\": \"<the token>\" } with an OAuth access token.")
+            println("  3. Save the tokenPayloadExternal JSON and feed THAT file back to --decode-verdict.")
+            println("Decrypt each token exactly once: re-decrypting the same token clears every verdict.")
+            return
+        }
+        val verdict = VerdictParser.parse(pasted)
             ?: error("Could not parse ${decodeVerdict.absolutePath} as a verdict JSON")
         for (line in VerdictParser.summarize(verdict)) {
             println(line)

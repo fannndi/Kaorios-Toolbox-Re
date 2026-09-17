@@ -62,6 +62,19 @@ object VerdictParser {
         val isVirtual: Boolean get() = VIRTUAL in deviceVerdicts
     }
 
+    /**
+     * True when the pasted text is a raw encrypted integrity token (JWE compact
+     * serialization: 5 dot-separated base64url segments) rather than the
+     * decrypted verdict JSON. Only Google's server can open it, so the CLI
+     * answers with the decrypt recipe instead of a bare parse error.
+     */
+    fun looksLikeRawToken(text: String): Boolean {
+        val trimmed = text.trim()
+        if (trimmed.isEmpty() || trimmed.startsWith("{")) return false
+        val segments = trimmed.split(".")
+        return segments.size >= 3 && segments.all { it.matches(Regex("[A-Za-z0-9_-]+")) }
+    }
+
     fun parse(json: String): IntegrityVerdict? {
         if (json.isBlank()) return null
         return try {
@@ -126,7 +139,13 @@ object VerdictParser {
         }
         if (verdict.deviceVerdicts.isEmpty()) {
             lines += "No device verdict: the request was unevaluated or failed before attestation ran."
-            lines += "Re-request integrity after Apply Play Integrity setup + Refresh + clear Play Store."
+            if (verdict.appVerdict == "UNEVALUATED" || verdict.licensingVerdict == "UNEVALUATED") {
+                // Documented replay protection: decrypting the same token twice
+                // clears every verdict, which looks exactly like a failed spoof.
+                lines += "Empty device + UNEVALUATED app verdicts also mean the SAME token was decrypted more than once."
+                lines += "Request a FRESH token from the app and decrypt it exactly once."
+            }
+            lines += "Otherwise re-request integrity after Apply Play Integrity setup + Refresh + clear Play Store."
         } else if (UNKNOWN in verdict.deviceVerdicts) {
             lines += "UNKNOWN device verdict: Play has insufficient information to evaluate this device."
         } else if (verdict.isVirtual) {
@@ -137,6 +156,9 @@ object VerdictParser {
         } else if (!verdict.meetsStrong) {
             lines += "DEVICE without STRONG: keybox present but Google does not trust the boot chain."
             lines += "Usual causes: revoked or soft-banned keybox, or (Android 13+) a PIF patch older than 12 months."
+            // STRONG is opt-in per Play Console project: a missing STRONG label
+            // can mean the developer never asked for it, not that we failed it.
+            lines += "Or the Play Console project never opted in to STRONG verdicts — unrequested labels are simply absent."
         } else {
             lines += "STRONG verdict: hardware-backed boot integrity is accepted by Google."
         }
