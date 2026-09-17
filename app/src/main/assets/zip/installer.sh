@@ -62,6 +62,17 @@ if [ -n "$FAILED" ]; then
   chmod 0755 /tmp/farewell-mount.sh
   /tmp/farewell-mount.sh >/dev/null 2>&1
   rm -f /tmp/farewell-mount.sh
+  if [ -f /tmp/farewell-mount.log ]; then
+    while read -r line; do
+      case "$line" in
+        *"needs SystemRW"*)
+          ui_print "!! $line"
+          ui_print "!! Flash SystemRW/MakeRW (recovery) once, then flash this zip again."
+          ;;
+      esac
+    done < /tmp/farewell-mount.log
+    rm -f /tmp/farewell-mount.log
+  fi
   FAILED=""
   for part in $NEEDED; do
     mount_one "$part" || FAILED="$FAILED /$part"
@@ -70,7 +81,9 @@ fi
 
 if [ -n "$FAILED" ]; then
   ui_print "!! Could not mount:$FAILED"
-  ui_print "!! Reboot TWRP and flash again."
+  ui_print "!! If this is MIUI 13/14, those partitions may be EROFS: flash"
+  ui_print "!! SystemRW/MakeRW first (it converts and resizes them), then retry."
+  ui_print "!! Nothing was changed. Reboot TWRP and flash again."
   exit 1
 fi
 
