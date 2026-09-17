@@ -3,6 +3,7 @@ package io.farewell.patcher
 import com.android.tools.smali.dexlib2.DexFileFactory
 import com.android.tools.smali.dexlib2.Opcodes
 import io.farewell.patcher.integrity.AttestationAudit
+import io.farewell.patcher.integrity.DevRegistration
 import io.farewell.patcher.integrity.IntegrityData
 import io.farewell.patcher.integrity.KeyboxVerifier
 import io.farewell.patcher.integrity.VerdictParser
@@ -26,6 +27,9 @@ fun main(args: Array<String>) {
     var auditPackage: String? = null
     var provisionHook: File? = null
     var provisionOut: File? = null
+    var checkRegistration: String? = null
+    var certSha256: String? = null
+    var apiKey: String? = null
     var patchProp: File? = null
     var propsFile: File? = null
     var dumpPropMaps: File? = null
@@ -47,6 +51,9 @@ fun main(args: Array<String>) {
             "--package" -> auditPackage = args[index + 1].also { index++ }
             "--provision-hook" -> provisionHook = File(args[index + 1]).also { index++ }
             "--provision-out" -> provisionOut = File(args[index + 1]).also { index++ }
+            "--check-registration" -> checkRegistration = args[index + 1].also { index++ }
+            "--cert-sha256" -> certSha256 = args[index + 1].also { index++ }
+            "--api-key" -> apiKey = args[index + 1].also { index++ }
             "--patch-prop" -> patchProp = File(args[index + 1]).also { index++ }
             "--props" -> propsFile = File(args[index + 1]).also { index++ }
             "--dump-prop-maps" -> dumpPropMaps = File(args[index + 1]).also { index++ }
@@ -170,6 +177,22 @@ fun main(args: Array<String>) {
             println(line)
         }
         println(report.summary())
+        return
+    }
+
+    val registrationTarget = checkRegistration
+    if (registrationTarget != null) {
+        // Android developer verification: from Sept 30 2026 (Brazil, Indonesia,
+        // Singapore, Thailand) and globally in 2027, installs from participating
+        // stores need a registered package. ADB installs and system-image apps
+        // stay exempt - which is what this project relies on.
+        val key = apiKey ?: System.getenv("GOOGLE_API_KEY")
+        val result = DevRegistration.check(registrationTarget, certSha256, key)
+        println(result.summary())
+        println("Endpoint: ${result.url}")
+        if (result.state == "NO_KEY") {
+            println("Provide --api-key <key> or set GOOGLE_API_KEY (Google Cloud project with the Android Developer ID Status API enabled).")
+        }
         return
     }
 

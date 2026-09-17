@@ -258,6 +258,44 @@ Safety rails: a restore zip is **refused** when every source of a jar is already
 not to do), and the patch build marks such a source so it never fabricates one silently. When the
 store exists, the restore zip is built from it and is verified to contain no hook class.
 
+## 📵 Android developer verification (2026–2027) — why this project stays installable
+
+The newest Google surface relevant to a self-built APK, surveyed 2026-09-17 from
+`developer.android.com/developer-verification` and the public discovery directory:
+
+- **Sept 30, 2026**: app registration by verified developers becomes mandatory for installs
+  from *participating stores* on certified devices in Brazil, **Indonesia**, Singapore and
+  Thailand. **2027**: the requirement goes global for all apps on certified devices.
+- **ADB installs stay exempt** — "Apps installed using ADB won't require verification", and the
+  24-hour advanced-flow waiting period does not apply to ADB. System-image apps (our
+  `Farewell-SystemApp-*.zip` installs this APK into `/system/priv-app`) are not store/user
+  installs at all, so the second path is future-proof by construction.
+- The check API is public but keyed (no OAuth): `GET
+  https://androiddeveloperidstatus.googleapis.com/v1/packages/<pkg-with-hyphens>/packageRegistrationStatus:check`
+  with `X-Goog-Api-Key`. Verified live: no key → `403 PERMISSION_DENIED`, bad key →
+  `400 API_KEY_INVALID`, and the documented response is `{"state": "REGISTERED" | ...}`.
+  `--check-registration <pkg> [--cert-sha256 <hex>]` wraps it (key via `--api-key` or
+  `GOOGLE_API_KEY`).
+
+Practical rule for surya: **update via `adb install -r`** (or keep the system-app copy current),
+and treat file-manager sideloading as a legacy path that will need the advanced flow after the
+global rollout.
+
+### Public attestation/verification surface — re-surveyed 2026-09-17
+
+- `/attestation/root`: still exactly **2 roots** — RSA-4096 `cedb1cb6…0dfc` (1312 B) and
+  Key Attestation CA1 (EC) `6d9db4ce…bcc0` (550 B); `Last-Modified: 2025-07-29`.
+- `/attestation/status`: **1746 entries, all REVOKED** (1720 `KEY_COMPROMISE` + 26
+  `SOFTWARE_FLAW`), fields limited to `status`/`reason`; `Last-Modified: 2026-09-09`.
+  Our hex-only serial lookup stays correct (a sample key is all digits, which is the
+  hex-that-looks-decimal trap the lookup was fixed for).
+- Play Integrity discovery: revision **`20260916`**, still exactly 3 methods and the same
+  verdict enums/schemas (no parser update needed).
+- A 30-path sweep of `android.googleapis.com` (`attestation/*`, `rkp/*`, `keyattestation/*`,
+  `droidguard/*`, `safetynet`, `integrity`, …) returned 404 everywhere except
+  `root`/`status`/`crl` — the public surface is fully mapped, and `/attestation/crl` remains the
+  2019 fossil documented above.
+
 ## 🏗️ Modules in detail
 
 ### `app/` — Farewell Toolbox APK
@@ -409,6 +447,7 @@ The app module has no JVM unit tests: AGP needs `androidJdkImage` for `compileDe
 ./gradlew :patcher:run --args="--decode-verdict /path/verdict.json"          # "did my spoof pass?" from a decrypted decodeIntegrityToken response
 ./gradlew :patcher:run --args="--audit-attestation chain.pem --challenge aabbcc"  # audit a served attestation chain (links, CA issuers, Google anchor, challenge echo)
 ./gradlew :patcher:run --args="--provision-hook build/hook/hook.dex"          # no-root hook update: settings-put commands for the chunked dex
+./gradlew :patcher:run --args="--check-registration com.example.app"         # Android developer verification: is the package registered? (needs GOOGLE_API_KEY)
 ./gradlew :patcher:run --args="--patch-prop build.prop --props props.json"  # apply a prop map to build.prop
 ./gradlew :patcher:run --args="--dump-prop-maps out/ --props Pif-props.json" # per-partition prop maps for a PIF
 ```
