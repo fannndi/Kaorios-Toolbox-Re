@@ -247,7 +247,18 @@ CI (`.github/workflows/`): `update_pif` runs daily (`cron 0 0 * * *`) and auto-c
 
 ## 🛠️ Building
 
-Requirements: **JDK 17+**, Android SDK (platform 37, build-tools 36/37), Android NDK (for `farewelld`).
+Requirements: **JDK 17** (Temurin `17.0.20.1`, [Windows x64 zip](https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.20.1%2B1/OpenJDK17U-jdk_x64_windows_hotspot_17.0.20.1_1.zip), sha256 `e53a79c3…affc7cb`),
+Android SDK (platform 37, build-tools 36/37), Android NDK (for `farewelld`).
+
+> Use exactly JDK 17: newer JDKs (e.g. 26) break AGP's `androidJdkImage`
+> transform, so `:app:assembleDebug` fails there while lighter tasks still
+> pass. Point Gradle at it without touching the repo or the system default:
+> `org.gradle.java.home=C:/Java/jdk-17.0.20.1` in `%USERPROFILE%/.gradle/gradle.properties`.
+>
+> One build covers **all three** surya ROMs (MIUI 12 = Android 10, MIUI 13/14 =
+> Android 12): the JDK is only the build toolchain, and the app picks the
+> `surya-miui12/13/14` profile itself at runtime. No per-Android-version SDK
+> platforms or separate builds needed — only `compileSdk` 37 must be installed.
 
 ```bash
 ./gradlew :app:assembleDebug                        # build the APK (also builds hook.dex)
