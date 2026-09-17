@@ -123,6 +123,26 @@ public final class HookConfig {
         return flag("keybox_spoof");
     }
 
+    /**
+     * Whether attestation may be forged for [packageName].
+     *
+     * Forging is opt-in per target: the app writes a `build` entry for every
+     * package that should see the spoofed identity (the GMS stack, Play Store
+     * and the key-attestation checkers), and nothing else. An ungated forger is
+     * exactly what PIF Detector's active probe catches by requesting
+     * `PURPOSE_ATTEST_KEY` from an unrelated app: without a gate it forges, and
+     * the answer contradicts itself. With the gate, a non-target app gets the
+     * genuine Keystore path, so an unprivileged detector has nothing to
+     * analyse.
+     */
+    public boolean isAttestTarget(String packageName) {
+        if (packageName == null || packageName.isEmpty()) {
+            return false;
+        }
+        JSONObject build = root.optJSONObject("build");
+        return build != null && build.has(packageName);
+    }
+
     public String securityPatch(String packageName) {
         String value = propOverride(packageName, "ro.build.version.security_patch");
         if (value != null && !value.isEmpty()) {

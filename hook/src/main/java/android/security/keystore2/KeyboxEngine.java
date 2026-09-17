@@ -48,6 +48,15 @@ public final class KeyboxEngine {
             if (context == null) {
                 return null;
             }
+            // Per-target gate: only the packages that should see the spoofed
+            // identity get an attestation forged for them. Anything else (a
+            // bank app, a detector asking for a PURPOSE_ATTEST_KEY under its own
+            // uid) falls through to the genuine Keystore path.
+            String caller = HookState.currentPackage();
+            if (!config.isAttestTarget(caller)) {
+                HookLog.d("attestation not forged: " + caller + " is not a configured target");
+                return null;
+            }
             String xml = readKeybox(context);
             if (xml == null || xml.isEmpty()) {
                 return null;
@@ -140,6 +149,13 @@ public final class KeyboxEngine {
             }
             Context context = HookState.context();
             if (context == null) {
+                return chain;
+            }
+            // Same per-target gate as generateKeyPair: a non-target app keeps
+            // the real device chain, so it cannot observe a forged one.
+            String caller = HookState.currentPackage();
+            if (!config.isAttestTarget(caller)) {
+                HookLog.d("device chain not replaced: " + caller + " is not a configured target");
                 return chain;
             }
             String xml = readKeybox(context);
