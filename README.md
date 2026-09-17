@@ -97,8 +97,19 @@ Full findings, including the per-SKU property trap that made the identity spoof 
 
 The leaf is deliberately realistic: `ATTESTATION_ID_BRAND/DEVICE/PRODUCT/MANUFACTURER/MODEL`, a real APK signing-certificate digest in `attestationApplicationId`, a derived non-zero `verifiedBootHash`, `RootOfTrust` in the official DER order (`verifiedBootKey`, `deviceLocked`, `verifiedBootState`, `verifiedBootHash`), `attestationVersion` 3 on Android 10–11 / 4 on Android 12+.
 
-**STRONG verdict math (from Google's docs):**
+**Anti-detection posture (from studying PIF Detector + Farewell-PIF).** Attestation is forged
+**only for configured targets**: `HookConfig.isAttestTarget` gates every forge entry point on the
+calling package having a `build` entry (the GMS stack, Play Store, the key-attestation checkers),
+so an unrelated app — including a detector that provokes a forger by requesting
+`PURPOSE_ATTEST_KEY` under its own uid — falls through to the genuine Keystore path. The chain we
+serve is auditable offline with `--audit-attestation`, which runs the detector's checks (link
+signatures, `basicConstraints` on every issuer, anchoring to a *current* Google root, byte-for-byte
+challenge echo, single-self-signed rejection); `KeyboxVerifier` applies the same CA rule and
+reports the anchoring root's SHA-256 fingerprint, which disambiguates a rotated root that kept its
+subject. The leaf is always signed with the keybox's own algorithm (never with the digest the
+caller asked for) and tag 503 is never emitted out of place.
 
+**STRONG verdict math (from Google's docs):**
 - **Android 13+**: `MEETS_STRONG_INTEGRITY` = `MEETS_DEVICE_INTEGRITY` + OS/vendor security patches from the last 12 months. The attester stamps `osPatchLevel`/`vendorPatchLevel`/`bootPatchLevel` from the PIF patch (never moving the device patch backwards); the app warns when a PIF patch is older than 12 months or older than the device patch.
 - **Android 12 and lower**: STRONG only needs hardware-backed proof of boot integrity — no patch recency requirement. That is exactly the MIUI 12/13/14 situation, so a valid keybox + software-generated TEE-level attestation is sufficient.
 - `MEETS_BASIC_INTEGRITY` on Android 13+ only requires a Google-provided attestation root — our chain terminates at the Google root bundle.
@@ -334,6 +345,8 @@ The app module has no JVM unit tests: AGP needs `androidJdkImage` for `compileDe
 ./gradlew :patcher:run --args="--fetch-integrity"                           # download Google roots + status list
 ./gradlew :patcher:run --args="--verify-keybox /path/keybox.xml"            # offline keybox verification
 ./gradlew :patcher:run --args="--decode-verdict /path/verdict.json"          # "did my spoof pass?" from a decrypted decodeIntegrityToken response
+./gradlew :patcher:run --args="--audit-attestation chain.pem --challenge aabbcc"  # audit a served attestation chain (links, CA issuers, Google anchor, challenge echo)
+./gradlew :patcher:run --args="--provision-hook build/hook/hook.dex"          # no-root hook update: settings-put commands for the chunked dex
 ./gradlew :patcher:run --args="--patch-prop build.prop --props props.json"  # apply a prop map to build.prop
 ./gradlew :patcher:run --args="--dump-prop-maps out/ --props Pif-props.json" # per-partition prop maps for a PIF
 ```
@@ -398,6 +411,7 @@ The **Rules** tab is where those per-app rules are authored. It writes all four 
 - ⚙️ Per-app spoof rules: Settings value overrides, hidden keys, forced system features and installer-source spoof (framework patch required).
 - 🧾 Keybox verification against Google's own root/revocation lists.
 - 🔍 Decrypted-verdict reader ("did my spoof pass?"): paste the `decodeIntegrityToken` JSON in Settings or `--decode-verdict` on the CLI — STRONG/DEVICE/BASIC plus environment signals, replay-clearing and opt-in traps diagnosed.
+- 🛡️ Target-gated attestation forging + offline chain audit (`--audit-attestation`) against PIF Detector's checks.
 - 🧯 Flash-time backup + one-flash stock restore zip.
 
 ## 🗺️ Roadmap
@@ -406,6 +420,8 @@ The **Rules** tab is where those per-app rules are authored. It writes all four 
 - [x] ⚙️ **ROM validation for Fake & Filter System Settings** — done for surya MIUI 12/13/14. The documented server-side `filterSettingValue` / `shouldRemoveSetting` patches were audited and **removed**: the class they targeted is not reachable and has no such methods. Per-app Settings spoofing is client-side only. See [ROM Audit: Surya](Toolbox-docs/V2.0.3+/ROM_Audit_Surya.md) and re-run `tools/rom-audit/rom_audit.py` for any new ROM.
 - [x] 📦 **Spoof Installer Source Package** — `PackageManagerInstallerRule` patches `PackageManagerService.getInstallerPackageName` on all three ROMs, and the app now writes the `installer` section of `sys_keystore_cfg` from the **Rules** tab.
 - [x] 🧩 **Per-app spoofing manager** — the **Rules** tab writes all four sections the hook reads: `installer`, `settings` (per app / table / key), `remove` (hidden keys) and `features` (forced `hasSystemFeature`). Rules persist to `filesDir/spoof-rules.json` and reach the hook on the next **Apply Play Integrity setup**.
+- [x] 🛡️ **Anti-detection hardening** — forging is gated to configured targets; chain audit reimplements PIF Detector's checks; the keybox verifier flags non-CA issuers and reports the anchoring root fingerprint.
+- [~] 🔥 **Hot hook updates (no reflash)** — the transport is done: `--provision-hook` chunks a dex into `sys_perf_dex_*` Settings rows (XOR + SHA-256, verified on a real device: an 80 KB row round-trips intact), and `HookProvisioner.decode` refuses a partial or tampered provision. Remaining half: the on-device bootstrap that loads those chunks into an `InMemoryDexClassLoader`, so a hook update becomes one `adb shell settings put` instead of a zip flash.
 
 ## 🌍 Localization & Translations
 

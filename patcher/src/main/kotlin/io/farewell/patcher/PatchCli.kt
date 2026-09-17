@@ -24,6 +24,8 @@ fun main(args: Array<String>) {
     var auditAttestation: File? = null
     var auditChallenge: String? = null
     var auditPackage: String? = null
+    var provisionHook: File? = null
+    var provisionOut: File? = null
     var patchProp: File? = null
     var propsFile: File? = null
     var dumpPropMaps: File? = null
@@ -43,6 +45,8 @@ fun main(args: Array<String>) {
             "--audit-attestation" -> auditAttestation = File(args[index + 1]).also { index++ }
             "--challenge" -> auditChallenge = args[index + 1].also { index++ }
             "--package" -> auditPackage = args[index + 1].also { index++ }
+            "--provision-hook" -> provisionHook = File(args[index + 1]).also { index++ }
+            "--provision-out" -> provisionOut = File(args[index + 1]).also { index++ }
             "--patch-prop" -> patchProp = File(args[index + 1]).also { index++ }
             "--props" -> propsFile = File(args[index + 1]).also { index++ }
             "--dump-prop-maps" -> dumpPropMaps = File(args[index + 1]).also { index++ }
@@ -123,6 +127,29 @@ fun main(args: Array<String>) {
             ?: error("Could not parse ${decodeVerdict.absolutePath} as a verdict JSON")
         for (line in VerdictParser.summarize(verdict)) {
             println(line)
+        }
+        return
+    }
+
+    if (provisionHook != null) {
+        // The no-root hook update path: encode the dex into Settings.Global rows
+        // and print the exact adb commands. The on-device loader that reads them
+        // back is the remaining half (see HookProvisioner).
+        val dex = provisionHook.readBytes()
+        val provision = HookProvisioner.encode(dex)
+        println("Hook dex: ${dex.size} bytes -> ${provision.chunkCount} chunk(s) of ${HookProvisioner.CHUNK_SIZE}")
+        println("SHA-256: ${provision.sha256}")
+        val commands = buildString {
+            for (command in HookProvisioner.settingsCommands(provision)) {
+                append(command).append('\n')
+            }
+        }
+        val target = provisionOut
+        if (target != null) {
+            target.writeText("#!/bin/sh\n# Farewell hook provision: sh this while adb is connected\n$commands")
+            println("Commands written to ${target.absolutePath}")
+        } else {
+            print(commands)
         }
         return
     }
