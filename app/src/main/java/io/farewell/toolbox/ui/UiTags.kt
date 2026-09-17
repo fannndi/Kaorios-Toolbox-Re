@@ -37,4 +37,32 @@ object UiTags {
     // Patch screen — readable state (drive the flow, then read these).
     const val PATCH_STATUS = "patch.status"
     const val PATCH_PROGRESS = "patch.progress"
+
+    // Data screen.
+    const val DATA_SYNC = "data.sync"
+    const val DATA_SYNC_RETRY = "data.sync.retry"
+    const val DATA_APPLY_PROPS = "data.apply.props"
+    const val DATA_REFRESH = "data.refresh"
+
+    // Rules screen — screen-level actions.
+    const val RULES_APPLY = "rules.apply"
+    const val RULES_CLEAR = "rules.clear"
+
+    // Settings screen.
+    const val SETTINGS_APPLY = "settings.apply"
+    const val SETTINGS_REFRESH_PI = "settings.refresh.playintegrity"
+    const val SETTINGS_PICK_KEYBOX = "settings.keybox.pick"
+    const val SETTINGS_EXPORT_PROPS = "settings.props.export"
+    const val SETTINGS_VERIFY_KEYBOX = "settings.keybox.verify"
+    const val SETTINGS_KEYBOX_HEALTHIEST = "settings.keybox.healthiest"
+    const val SETTINGS_KEYBOX_NEXT = "settings.keybox.next"
+    const val SETTINGS_CHECK_READINESS = "settings.readiness.check"
+    const val SETTINGS_AUTO_REFRESH = "settings.autorefresh"
+    const val SETTINGS_AUTO_REFRESH_NOW = "settings.autorefresh.now"
+    const val SETTINGS_VERDICT_BASIC = "settings.verdict.basic"
+    const val SETTINGS_VERDICT_DEVICE = "settings.verdict.device"
+    const val SETTINGS_VERDICT_STRONG = "settings.verdict.strong"
+    const val SETTINGS_VERDICT_ANALYZE = "settings.verdict.analyze"
+    const val SETTINGS_REFRESH = "settings.refresh"
+    const val SETTINGS_REBOOT = "settings.reboot"
 }

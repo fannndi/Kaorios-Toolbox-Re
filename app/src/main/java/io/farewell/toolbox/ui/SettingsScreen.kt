@@ -23,6 +23,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import io.farewell.toolbox.BuildConfig
@@ -55,56 +56,56 @@ fun SettingsScreen(state: PatchUiState, viewModel: MainViewModel, modifier: Modi
                 Button(
                     onClick = { viewModel.applyPlayIntegrity() },
                     enabled = !state.busy,
-                    modifier = Modifier.padding(top = 8.dp)
+                    modifier = Modifier.padding(top = 8.dp).testTag(UiTags.SETTINGS_APPLY)
                 ) {
                     Text("Apply Play Integrity setup")
                 }
                 Button(
                     onClick = { viewModel.refreshPlayIntegrity() },
                     enabled = !state.busy,
-                    modifier = Modifier.padding(top = 8.dp)
+                    modifier = Modifier.padding(top = 8.dp).testTag(UiTags.SETTINGS_REFRESH_PI)
                 ) {
                     Text("Refresh + clear Play Store")
                 }
                 OutlinedButton(
                     onClick = { keyboxPicker.launch("*/*") },
                     enabled = !state.busy,
-                    modifier = Modifier.padding(top = 8.dp)
+                    modifier = Modifier.padding(top = 8.dp).testTag(UiTags.SETTINGS_PICK_KEYBOX)
                 ) {
                     Text(if (state.keyboxImported) "Replace keybox XML" else "Import keybox XML")
                 }
                 OutlinedButton(
                     onClick = { viewModel.exportPropOverlay() },
                     enabled = !state.busy,
-                    modifier = Modifier.padding(top = 8.dp)
+                    modifier = Modifier.padding(top = 8.dp).testTag(UiTags.SETTINGS_EXPORT_PROPS)
                 ) {
                     Text("Export ROM prop overlay")
                 }
                 OutlinedButton(
                     onClick = { viewModel.verifyKeybox() },
                     enabled = !state.busy && state.keyboxImported,
-                    modifier = Modifier.padding(top = 8.dp)
+                    modifier = Modifier.padding(top = 8.dp).testTag(UiTags.SETTINGS_VERIFY_KEYBOX)
                 ) {
                     Text("Verify keybox (Google lists)")
                 }
                 OutlinedButton(
                     onClick = { viewModel.pickHealthiestKeybox() },
                     enabled = !state.busy && state.keyboxCount > 0,
-                    modifier = Modifier.padding(top = 8.dp)
+                    modifier = Modifier.padding(top = 8.dp).testTag(UiTags.SETTINGS_KEYBOX_HEALTHIEST)
                 ) {
                     Text("Validate & pick healthiest keybox")
                 }
                 OutlinedButton(
                     onClick = { viewModel.useNextKeybox() },
                     enabled = !state.busy && state.keyboxCount > 1,
-                    modifier = Modifier.padding(top = 8.dp)
+                    modifier = Modifier.padding(top = 8.dp).testTag(UiTags.SETTINGS_KEYBOX_NEXT)
                 ) {
                     Text("Use next keybox (soft-ban fallback)")
                 }
                 OutlinedButton(
                     onClick = { viewModel.checkReadiness() },
                     enabled = !state.busy,
-                    modifier = Modifier.padding(top = 8.dp)
+                    modifier = Modifier.padding(top = 8.dp).testTag(UiTags.SETTINGS_CHECK_READINESS)
                 ) {
                     Text("STRONG readiness check")
                 }
@@ -118,7 +119,7 @@ fun SettingsScreen(state: PatchUiState, viewModel: MainViewModel, modifier: Modi
             Column(Modifier.padding(16.dp)) {
                 Text("Automation", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Switch(checked = state.autoRefresh, onCheckedChange = { viewModel.setAutoRefresh(it) })
+                    Switch(checked = state.autoRefresh, onCheckedChange = { viewModel.setAutoRefresh(it) }, modifier = Modifier.testTag(UiTags.SETTINGS_AUTO_REFRESH))
                     Text("Auto-refresh every 6h (PIF + keybox health)", style = MaterialTheme.typography.bodySmall)
                 }
                 if (state.autoRefreshLast.isNotEmpty()) {
@@ -127,7 +128,7 @@ fun SettingsScreen(state: PatchUiState, viewModel: MainViewModel, modifier: Modi
                 OutlinedButton(
                     onClick = { viewModel.runAutoRefreshNow() },
                     enabled = !state.busy,
-                    modifier = Modifier.padding(top = 8.dp)
+                    modifier = Modifier.padding(top = 8.dp).testTag(UiTags.SETTINGS_AUTO_REFRESH_NOW)
                 ) {
                     Text("Run auto-refresh now")
                 }
@@ -145,21 +146,21 @@ fun SettingsScreen(state: PatchUiState, viewModel: MainViewModel, modifier: Modi
                 var device by remember { mutableStateOf(false) }
                 var strong by remember { mutableStateOf(false) }
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Switch(checked = basic, onCheckedChange = { basic = it })
+                    Switch(checked = basic, onCheckedChange = { basic = it }, modifier = Modifier.testTag(UiTags.SETTINGS_VERDICT_BASIC))
                     Text("MEETS_BASIC_INTEGRITY", style = MaterialTheme.typography.bodySmall)
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Switch(checked = device, onCheckedChange = { device = it })
+                    Switch(checked = device, onCheckedChange = { device = it }, modifier = Modifier.testTag(UiTags.SETTINGS_VERDICT_DEVICE))
                     Text("MEETS_DEVICE_INTEGRITY", style = MaterialTheme.typography.bodySmall)
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Switch(checked = strong, onCheckedChange = { strong = it })
+                    Switch(checked = strong, onCheckedChange = { strong = it }, modifier = Modifier.testTag(UiTags.SETTINGS_VERDICT_STRONG))
                     Text("MEETS_STRONG_INTEGRITY", style = MaterialTheme.typography.bodySmall)
                 }
                 Button(
                     onClick = { viewModel.analyzeVerdict(basic, device, strong) },
                     enabled = !state.busy,
-                    modifier = Modifier.padding(top = 8.dp)
+                    modifier = Modifier.padding(top = 8.dp).testTag(UiTags.SETTINGS_VERDICT_ANALYZE)
                 ) {
                     Text("Analyze verdict")
                 }
@@ -189,11 +190,11 @@ fun SettingsScreen(state: PatchUiState, viewModel: MainViewModel, modifier: Modi
             }
         }
 
-        OutlinedButton(onClick = { viewModel.refreshStatus() }, enabled = !state.busy) {
+        OutlinedButton(onClick = { viewModel.refreshStatus() }, enabled = !state.busy, modifier = Modifier.testTag(UiTags.SETTINGS_REFRESH)) {
             Text("Re-check patch status")
         }
 
-        OutlinedButton(onClick = { viewModel.reboot() }) {
+        OutlinedButton(onClick = { viewModel.reboot() }, modifier = Modifier.testTag(UiTags.SETTINGS_REBOOT)) {
             Text("Reboot device")
         }
     }

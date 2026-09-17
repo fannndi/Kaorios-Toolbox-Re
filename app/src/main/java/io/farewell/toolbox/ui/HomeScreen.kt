@@ -18,6 +18,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import io.farewell.toolbox.BuildConfig
@@ -40,7 +41,7 @@ fun HomeScreen(state: PatchUiState, viewModel: MainViewModel, modifier: Modifier
                     Text(state.dataMessage, style = MaterialTheme.typography.bodySmall)
                 }
                 Spacer(Modifier.height(8.dp))
-                Button(onClick = { viewModel.syncData() }, enabled = !state.busy) {
+                Button(onClick = { viewModel.syncData() }, enabled = !state.busy, modifier = Modifier.testTag(UiTags.DATA_SYNC)) {
                     Text("Sync data")
                 }
             }
@@ -74,10 +75,10 @@ fun HomeScreen(state: PatchUiState, viewModel: MainViewModel, modifier: Modifier
                 )
                 Spacer(Modifier.height(8.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(onClick = { viewModel.applyNativeProps() }, enabled = !state.busy) {
+                    Button(onClick = { viewModel.applyNativeProps() }, enabled = !state.busy, modifier = Modifier.testTag(UiTags.DATA_APPLY_PROPS)) {
                         Text("Apply native props")
                     }
-                    OutlinedButton(onClick = { viewModel.refreshStatus() }, enabled = !state.busy) {
+                    OutlinedButton(onClick = { viewModel.refreshStatus() }, enabled = !state.busy, modifier = Modifier.testTag(UiTags.DATA_REFRESH)) {
                         Text("Re-check")
                     }
                 }
@@ -90,7 +91,7 @@ fun HomeScreen(state: PatchUiState, viewModel: MainViewModel, modifier: Modifier
                 Spacer(Modifier.height(6.dp))
                 Text(BuildConfig.DATA_BASE_URL, style = MaterialTheme.typography.bodySmall)
                 Spacer(Modifier.height(8.dp))
-                OutlinedButton(onClick = { viewModel.syncData() }, enabled = !state.busy) {
+                OutlinedButton(onClick = { viewModel.syncData() }, enabled = !state.busy, modifier = Modifier.testTag(UiTags.DATA_SYNC_RETRY)) {
                     Text("Refresh data")
                 }
             }

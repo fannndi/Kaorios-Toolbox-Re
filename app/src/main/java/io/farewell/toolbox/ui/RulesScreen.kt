@@ -26,6 +26,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import io.farewell.patcher.SpoofRules
@@ -69,14 +70,14 @@ fun RulesScreen(state: PatchUiState, viewModel: MainViewModel, modifier: Modifie
                 Button(
                     onClick = { viewModel.applyPlayIntegrity() },
                     enabled = !state.busy,
-                    modifier = Modifier.padding(top = 8.dp)
+                    modifier = Modifier.padding(top = 8.dp).testTag(UiTags.RULES_APPLY)
                 ) {
                     Text("Apply Play Integrity setup")
                 }
                 OutlinedButton(
                     onClick = { viewModel.clearRules() },
                     enabled = !state.busy && !state.rules.isEmpty,
-                    modifier = Modifier.padding(top = 8.dp)
+                    modifier = Modifier.padding(top = 8.dp).testTag(UiTags.RULES_CLEAR)
                 ) {
                     Text("Clear all rules")
                 }
