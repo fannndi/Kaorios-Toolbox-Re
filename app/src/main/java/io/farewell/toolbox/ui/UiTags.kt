@@ -32,6 +32,7 @@ object UiTags {
     const val PATCH_BUILD = "patch.build"
     const val PATCH_EXPORT_ZIP = "patch.export.zip"
     const val PATCH_EXPORT_BACKUP = "patch.export.backup"
+    const val PATCH_EXPORT_SEED = "patch.export.seed"
     const val PATCH_REBOOT = "patch.reboot"
 
     // Patch screen — readable state (drive the flow, then read these).

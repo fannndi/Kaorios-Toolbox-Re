@@ -161,6 +161,27 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun exportSeedZip() {
+        viewModelScope.launch(Dispatchers.IO) {
+            _state.update { it.copy(busy = true, progress = "Building seed zip...") }
+            try {
+                val seed = repository.buildSeedZip()
+                repository.exportToDownloads(seed, seed.name)
+                _state.update {
+                    it.copy(
+                        busy = false,
+                        progress = "",
+                        log = it.log + "Seed zip exported to Downloads/Farewell/${seed.name}"
+                    )
+                }
+            } catch (throwable: Throwable) {
+                _state.update {
+                    it.copy(busy = false, progress = "", log = it.log + "Seed export failed: ${throwable.message}")
+                }
+            }
+        }
+    }
+
     fun exportZip(file: File, displayName: String) {
         viewModelScope.launch(Dispatchers.IO) {
             try {

@@ -193,10 +193,28 @@ running `farewelld`). Measured on a real stock surya via `run-as` (app UID) and 
 | `/vendor/build_<sku>.prop`, `/vendor/odm/etc/build_*.prop` | ✅ (odm file) | ✅ | vendor-labelled files are readable |
 | `settings put global` (config blobs) | ❌ | ✅ | PC `adb shell` writes them fine; a custom recovery can ship them in the zip |
 
-Consequences: a no-root flow can patch jars in-app and export the zips, but the property layer
-needs either recovery (TWRP: pull the prop files, flash the patched ones back) or root. Shizuku
-does not change this on Android 10 — it needs USB re-activation after every reboot there, and
-the shell UID it grants still cannot read `build.prop` or write `/system`.
+**Root is optional.** The app implements the full build without it:
+
+1. **Jars are read directly** — `pullFromSources` tries the live system path first, which works for
+   the framework jars as the app uid (verified on-device: status reads "Stock framework detected
+   (direct)" with no root).
+2. **Prop files come from a seed** — the app exports `Farewell-Seed-<profile>.zip`, a TWRP
+   flashable that copies the stock prop files into its own external files dir
+   (`Android/data/io.farewell.toolbox/files/seed/`, no permission needed). `pullFromSources` falls
+   back to that copy; `su cat` is only the third choice.
+3. **Config rides the patch zip** — `keystore_cfg` / `keybox_cfg` (the same `k2:` blobs
+   `settings put` would carry) are written to `/system/etc/farewell/` by the installer, and the
+   hook falls back to those files when the Settings row is empty (`ConfigFile`). A rooted user
+   keeps live updates: Settings wins when present.
+4. **`farewelld`** is the one genuine root-only piece left (stock mode streams it via `su`);
+   without it the native `ro.boot.*` layer is absent and the Java hook still covers target
+   processes. ROM-integration mode remains the rootless option for that layer.
+
+Verified end-to-end on the connected surya: with no root and a fabricated seed, the app built
+`Farewell-Patch-surya-miui12-*.zip` — both jars patched (hook present in 3 dex entries), six prop
+files patched, `keystore_cfg` embedded — and exported it. Shizuku would not change any of this on
+Android 10: it needs USB re-activation after every reboot there, and the shell UID it grants still
+cannot read `build.prop` or write `/system`.
 
 ## 🏗️ Modules in detail
 
@@ -330,6 +348,7 @@ The `:hook` tests run the device-side DER/attestation builders on the JVM and ro
 | `HookCodecTest` | The app↔hook config channel (`sys_keystore_cfg`, invariant #6): `HookCodec.decode` turns a `k2:` base64+XOR blob back into JSON. `android.util.Base64` is a JVM stub, so this injects the real `java.util.Base64` via the `Decoder` seam and pins the round trip, the no-prefix passthrough, and best-effort on garbage — guarding the XOR key and prefix that, if mismatched, silently break every spoof |
 | `KeyboxEngineRevocationTest` | The integration the other two miss: `KeyboxEngine.chainForAlias` gates the spoofed keybox chain on `KeyboxRevocation`. Wires a `KeyboxRevocation` backed by a disk cache (no network) and a generated alias entry via reflection, then asserts `chainForAlias` returns **null** (so the caller serves the real device chain) when the serial is revoked, and returns the exact spoofed chain when it is not. Closes the loop between the two classes without a device |
 | `HookDebugTest` | The ADB debug path: `dump` exposes every field as greppable `[farewell] key=value` lines, the no-config state reads `config.present=false` with `keybox.chain=-1` instead of staying silent, and verbose stays off unless the platform switch (or test seam) turns it on |
+| `HookConfigFileTest` | The rootless config channel: `ConfigFile.read` returns the provisioned blob, missing/empty files read as null (never an empty config), and the three `/system/etc/farewell/` paths the installer writes are pinned |
 
 `KeyboxRevocation` is wired into `KeyboxEngine.replaceChain` and `chainForAlias`: if the spoofed keybox's serial is in Google's revoked list, the hook serves the **real device chain** instead. It is best-effort — if the list cannot be fetched or parsed, the check returns "not revoked" and the spoofed chain is served as before, so a transient network failure never silently disables the user's setup.
 
@@ -440,7 +459,7 @@ If you are an LLM or a new developer touching this repo, these are the load-bear
 3. **`hook/` compiles against `android.jar` only** (Java 11, `compileOnly`) and runs on the boot classpath of Android 10+. No lambdas/streams/AndroidX there; R8 renames everything except the generated facade.
 4. **Rules are signature-gated.** Every rule must (a) set a correct `apiRange`, (b) report a graceful outcome instead of throwing when a signature is missing, (c) use `HookIdentity.M_*` constants. Porting to a new ROM: run `--scan` on its stock jars, then update `PlatformProfile`.
 5. **Never patch `SettingsProvider.apk`**, `miui-framework.jar`, `miui-services.jar`, `miuix.jar` — audited not to contain the patched classes; touching them widens the blast radius on MIUI.
-6. **The two config blobs are the app↔hook state contract**: `sys_keystore_cfg` (PIF/flags) and `sys_keybox_cfg` (keybox), both `k2:` base64+XOR via `Codec`/`HookCodec`. Any field added on the app side must be consumed on the hook side too.
+6. **The two config blobs are the app↔hook state contract**: `sys_keystore_cfg` (PIF/flags) and `sys_keybox_cfg` (keybox), both `k2:` base64+XOR via `Codec`/`HookCodec`. Any field added on the app side must be consumed on the hook side too. There are **two channels** carrying the same bytes: `Settings.Global` (live, needs shell/root) and `/system/etc/farewell/keystore_cfg` + `keybox_cfg` (flash-time, rootless, read via `ConfigFile` with Settings winning when present) — keep the paths in `ConfigFile` and the zip entry names in `PatchRepository`/`installer.sh` in sync.
 7. **`farewelld` only updates existing properties** and skips long/empty values; the property-area layout is pinned to bionic (see `native/rom/README.md`). Do not make it create new properties.
 8. **The installer must stay abort-safe**: if any manifest entry cannot be written, abort before changing anything. The backup/restore contract (`/data/media/0/Farewell/backup-<stamp>/` + generated `restore.sh`) is what users rely on for recovery — validate changes with `native/tests/installer-test.sh`.
 9. **Scope is surya, and the docs say so.** Supported ROMs are MIUI 12 (Android 10), MIUI 13 and MIUI 14 (Android 12) on POCO X3 only. Do not add rules or profiles for classes that only exist on Android 13+ — audit the stock images first with `tools/rom-audit/rom_audit.py`, and check who wins each property key with `tools/rom-audit/prop_resolve.py`. Docs are **English only**; the smali templates in `Toolbox-docs/Template/Template_V2060/` are the canonical call-site reference — keep them in sync when rules change, and delete a template when its rule goes.

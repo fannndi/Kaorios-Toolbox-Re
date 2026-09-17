@@ -252,10 +252,16 @@ public final class KeyboxEngine {
         HookState.beginInternal();
         try {
             String raw = Settings.Global.getString(context.getContentResolver(), HookConfig.KEY_KEYBOX);
-            return HookCodec.decode(raw);
+            String decoded = HookCodec.decode(raw);
+            if (decoded != null && !decoded.isEmpty()) {
+                return decoded;
+            }
+            // Rootless: the patch zip carries the keybox to
+            // /system/etc/farewell/keybox_cfg, where any process can read it.
+            return HookCodec.decode(ConfigFile.read(new File(ConfigFile.KEYBOX)));
         } catch (Throwable throwable) {
             HookLog.e("keybox read", throwable);
-            return null;
+            return HookCodec.decode(ConfigFile.read(new File(ConfigFile.KEYBOX)));
         } finally {
             HookState.endInternal();
         }

@@ -98,10 +98,31 @@ fun PatchScreen(state: PatchUiState, viewModel: MainViewModel, modifier: Modifie
                 }
                 Button(
                     onClick = { viewModel.buildPatch() },
-                    enabled = !state.busy && state.root == true && viewModel.device.supportedDevice,
+                    enabled = !state.busy && viewModel.device.supportedDevice,
                     modifier = Modifier.testTag(UiTags.PATCH_BUILD)
                 ) {
                     Text("Build Patch ZIP")
+                }
+            }
+        }
+
+        item {
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(16.dp)) {
+                    Text("No root? Use the seed", fontWeight = FontWeight.Bold)
+                    Text(
+                        "The prop files are unreadable without root (SELinux). Flash this seed zip once in TWRP: " +
+                            "it copies the stock files into the app folder, then Build Patch ZIP works rootless.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedButton(
+                        onClick = { viewModel.exportSeedZip() },
+                        enabled = !state.busy && viewModel.device.supportedDevice,
+                        modifier = Modifier.testTag(UiTags.PATCH_EXPORT_SEED)
+                    ) {
+                        Text("Export seed zip")
+                    }
                 }
             }
         }

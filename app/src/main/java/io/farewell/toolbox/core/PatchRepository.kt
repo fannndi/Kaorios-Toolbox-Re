@@ -38,23 +38,78 @@ class PatchRepository(private val context: Context) {
     private val workDir: File
         get() = File(context.cacheDir, "farewell-work").apply { mkdirs() }
 
+    /**
+     * Stock files dumped by the TWRP seed zip.
+     *
+     * The app's own external files dir needs no permission and TWRP can write
+     * there, so a seed flash is what lets a build.prop be patched on a device
+     * without root — the prop files are unreadable to both the app and the
+     * shell (SELinux), only recovery and root can open them.
+     */
+    val seedDir: File
+        get() = File(context.getExternalFilesDir(null), "seed")
+
+    fun seedFileCount(): Int {
+        val dir = seedDir
+        if (!dir.exists()) return 0
+        return dir.walkTopDown().count { it.isFile }
+    }
+
     suspend fun detectStatus(): PatchStatus = withContext(Dispatchers.IO) {
-        if (!RootShell.isRootAvailable()) {
-            return@withContext PatchStatus(false, false, null, "Root access unavailable", device.profile.id)
-        }
         val probe = File(workDir, "installed-framework.jar")
         probe.delete()
-        val result = RootShell.copyToFile(FRAMEWORK_CAT, probe, timeoutSeconds = 300)
-        if (result.code != 0 || !probe.exists() || probe.length() == 0L) {
-            return@withContext PatchStatus(true, false, null, "Could not read framework.jar: ${result.output}", device.profile.id)
-        }
+        val source = pullFromSources("system/framework/framework.jar", probe)
+            ?: return@withContext PatchStatus(
+                RootShell.isRootAvailable(), false, null,
+                "Could not read framework.jar (no root, no seed); export and flash the seed zip first",
+                device.profile.id
+            )
         val containsHook = containsAscii(probe, MARKER_CLASS.toByteArray(Charsets.US_ASCII))
         val version = readVersion(probe)
         probe.delete()
         if (containsHook) {
-            PatchStatus(true, true, version, "Farewell patch installed", device.profile.id)
+            PatchStatus(RootShell.isRootAvailable(), true, version, "Farewell patch installed ($source)", device.profile.id)
         } else {
-            PatchStatus(true, false, null, "Stock framework detected", device.profile.id)
+            PatchStatus(RootShell.isRootAvailable(), false, null, "Stock framework detected ($source)", device.profile.id)
+        }
+    }
+
+    /**
+     * Reads one stock file without requiring root when possible.
+     *
+     * Order: the live system path (readable for the framework jars as the app
+     * uid — verified on a stock surya), then the TWRP seed copy, then `su cat`
+     * for a rooted device. Returns a human-readable source label, or null.
+     */
+    private fun pullFromSources(systemPath: String, dest: File): String? {
+        val direct = File("/$systemPath")
+        if (readInto(direct, dest)) {
+            return "direct"
+        }
+        val seed = File(seedDir, systemPath)
+        if (readInto(seed, dest)) {
+            return "seed"
+        }
+        if (RootShell.isRootAvailable()) {
+            val pull = RootShell.copyToFile(catCommand(systemPath), dest, timeoutSeconds = 600)
+            if (pull.code == 0 && dest.length() > 0L) {
+                return "root"
+            }
+        }
+        dest.delete()
+        return null
+    }
+
+    private fun readInto(source: File, dest: File): Boolean {
+        if (!source.exists() || !source.isFile) return false
+        return try {
+            source.inputStream().use { input ->
+                dest.outputStream().use { output -> input.copyTo(output) }
+            }
+            dest.length() > 0L
+        } catch (throwable: Throwable) {
+            dest.delete()
+            false
         }
     }
 
@@ -65,13 +120,21 @@ class PatchRepository(private val context: Context) {
             report.append(message).append('\n')
         }
 
-        step("Checking root access")
-        check(RootShell.isRootAvailable()) { "Root access unavailable" }
+        step("Checking stock sources")
         check(device.supportedDevice) {
             "Unsupported device: ${device.device} / ${device.model}. Farewell patch targets surya only."
         }
+        val hasRoot = RootShell.isRootAvailable()
+        val seedCount = seedFileCount()
         step("Device: ${device.model} (${device.device}), ${device.miuiLabel}, Android ${device.androidApi}")
         step("Profile: ${device.profile.id} (${device.profile.label})")
+        step(
+            when {
+                seedCount > 0 -> "Sources: seed ($seedCount files)${if (hasRoot) " + root" else ""}"
+                hasRoot -> "Sources: root (seed not flashed)"
+                else -> "Sources: direct + seed only (no root)"
+            }
+        )
 
         val hookDex = context.assets.open("hook.dex").use { it.readBytes() }
         step("Hook dex: ${hookDex.size} bytes")
@@ -119,15 +182,19 @@ class PatchRepository(private val context: Context) {
             val name = target.systemPath.replace('/', '_')
             val stockFile = File(workDir, "${target.kind.name.lowercase()}-stock-$name")
             stockFile.delete()
-            step("Pulling /${target.systemPath}")
-            val pull = RootShell.copyToFile(catCommand(target.systemPath), stockFile, timeoutSeconds = 600)
-            if (pull.code != 0 || stockFile.length() == 0L) {
+            step("Reading /${target.systemPath}")
+            val source = pullFromSources(target.systemPath, stockFile)
+            if (source == null) {
                 if (target.required) {
-                    error("Failed to pull /${target.systemPath}: ${pull.output}")
+                    error(
+                        "Could not read /${target.systemPath}: no root, and no seed copy. " +
+                            "Flash Farewell-Seed-<profile>.zip in TWRP once, then build again."
+                    )
                 }
                 step("  not present, skipped")
                 continue
             }
+            step("  source: $source (${stockFile.length() / 1024} KB)")
             stockFiles[target.zipPath] = stockFile
 
             val patchedFile = File(workDir, "${target.kind.name.lowercase()}-patched-$name")
@@ -167,6 +234,21 @@ class PatchRepository(private val context: Context) {
         if (daemonConfig.isNotEmpty()) {
             patchExtras["system_root/system/etc/farewell/props.conf"] = daemonConfig.toByteArray(Charsets.UTF_8)
         }
+        // Rootless config: the same k2: blobs `settings put` would carry, but
+        // flashed where every process can read them. The hook prefers Settings
+        // and falls back to these files, so a rooted user keeps live updates.
+        val zipConfig = PlayIntegritySetup.configForZip(context)
+        if (zipConfig != null) {
+            patchExtras["system_root/system/etc/farewell/keystore_cfg"] =
+                zipConfig.first.toByteArray(Charsets.UTF_8)
+            zipConfig.second?.let { keybox ->
+                patchExtras["system_root/system/etc/farewell/keybox_cfg"] =
+                    keybox.toByteArray(Charsets.UTF_8)
+            }
+            step("Config embedded in zip: keystore_cfg${if (zipConfig.second != null) " + keybox_cfg" else ""}")
+        } else {
+            step("Config not embedded (no PIF data yet) - apply Play Integrity setup first")
+        }
         val patchTemplate = templateEntries(stamp, restore = false, payload = patchedFiles.keys, extras = patchExtras.keys)
         patchTemplate.putAll(patchExtras)
         FlashZipBuilder.build(patchZip, patchTemplate, patchedFiles)
@@ -182,6 +264,30 @@ class PatchRepository(private val context: Context) {
         step("Restore zip: ${backupZip.name}")
         step("Done")
         BuildResult(patchZip, backupZip, report.toString())
+    }
+
+    /**
+     * The seed zip: a tiny TWRP flashable that copies the stock files the app
+     * cannot read (build.prop family) into the app's external files dir. After
+     * one seed flash, every build works with no root.
+     */
+    fun buildSeedZip(): File {
+        val stamp = SimpleDateFormat("yyyyMMdd-HHmm", Locale.US).format(Date())
+        val zip = File(workDir, "Farewell-Seed-${device.profile.id}-$stamp.zip")
+        val paths = LinkedHashSet<String>()
+        for (target in device.profile.targets) {
+            paths += target.zipPath
+        }
+        for (target in PlatformProfiles.skuPropTargets(device.hardwareSku)) {
+            paths += target.zipPath
+        }
+        val template = LinkedHashMap<String, ByteArray>()
+        template["META-INF/com/google/android/update-binary"] = assetText("zip/seed.sh")
+        template["META-INF/com/google/android/updater-script"] = "#dummy\n".toByteArray(Charsets.UTF_8)
+        template["META-INF/com/ks/mount.sh"] = assetText("zip/META-INF/com/ks/mount.sh")
+        template["seed.txt"] = paths.sorted().joinToString("\n").plus("\n").toByteArray(Charsets.UTF_8)
+        FlashZipBuilder.build(zip, template, emptyMap())
+        return zip
     }
 
     fun exportToDownloads(file: File, displayName: String, mimeType: String = "application/zip"): String {
@@ -235,7 +341,9 @@ class PatchRepository(private val context: Context) {
         builder.append("# profile=").append(device.profile.id).append('\n')
         if (restore) {
             builder.append("# delete=system_root/system/etc/permissions/privapp-permissions-io.farewell.toolbox.xml")
-            builder.append(",system_root/system/etc/farewell/props.conf\n")
+            builder.append(",system_root/system/etc/farewell/props.conf")
+            builder.append(",system_root/system/etc/farewell/keystore_cfg")
+            builder.append(",system_root/system/etc/farewell/keybox_cfg\n")
         }
         for (path in files.toSortedSet()) {
             builder.append(path).append(" 0644\n")
@@ -292,8 +400,6 @@ class PatchRepository(private val context: Context) {
     }
 
     companion object {
-        private val FRAMEWORK_CAT =
-            "cat /system/framework/framework.jar 2>/dev/null || cat /system_root/system/framework/framework.jar"
         private val MARKER_CLASS = io.farewell.patcher.HookIdentity.HOOK_CLASS
         private const val VERSION_PREFIX = "ks2-"
         private const val VERSION_SCAN_LIMIT = 1 shl 20

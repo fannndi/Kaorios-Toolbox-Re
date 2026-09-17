@@ -266,6 +266,21 @@ object PlayIntegritySetup {
         return builder.toString()
     }
 
+    /**
+     * The config for a rootless device: the same `k2:` blobs [apply] would write
+     * into `Settings.Global`, so the patch zip can ship them to
+     * `/system/etc/farewell/` and the hook falls back to them. Returns
+     * `(keystore_cfg, keybox_cfg?)`, or null when there is no PIF data yet.
+     */
+    fun configForZip(context: Context): Pair<String, String?>? {
+        val pif = loadPif(context) ?: return null
+        val keyboxFile = File(context.filesDir, KEYBOX_FILE)
+        val keybox = keyboxFile.takeIf { it.exists() }?.readText()?.trim()?.takeIf { it.isNotEmpty() }
+        val rules = SpoofRulesStore.load(context)
+        val json = buildConfig(pif, PlayIntegrityFlags(), keybox != null, rules)
+        return Codec.encode(json) to keybox?.let { Codec.encode(it) }
+    }
+
     private fun buildConfig(
         pif: JSONObject,
         flags: PlayIntegrityFlags,

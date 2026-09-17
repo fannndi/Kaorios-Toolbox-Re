@@ -50,13 +50,20 @@ public final class HookConfig {
 
     public static HookConfig load(ContentResolver resolver) {
         if (resolver == null) {
-            return EMPTY;
+            return parse(ConfigFile.read(new java.io.File(ConfigFile.KEYSTORE)));
         }
         try {
-            return parse(Settings.Global.getString(resolver, KEY_CONFIG));
+            String raw = Settings.Global.getString(resolver, KEY_CONFIG);
+            if (raw == null || raw.isEmpty()) {
+                // Rootless: the patch zip wrote the blob where any process can
+                // read it. Settings wins when it exists, so a rooted user keeps
+                // live config updates.
+                raw = ConfigFile.read(new java.io.File(ConfigFile.KEYSTORE));
+            }
+            return parse(raw);
         } catch (Throwable throwable) {
             HookLog.e("config read failed", throwable);
-            return EMPTY;
+            return parse(ConfigFile.read(new java.io.File(ConfigFile.KEYSTORE)));
         }
     }
 
