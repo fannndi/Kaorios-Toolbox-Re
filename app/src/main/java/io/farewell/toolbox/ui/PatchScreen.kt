@@ -25,6 +25,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 
@@ -53,7 +54,11 @@ fun PatchScreen(state: PatchUiState, viewModel: MainViewModel, modifier: Modifie
                         )
                     }
                     Spacer(Modifier.height(6.dp))
-                    Text(state.statusMessage, style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        state.statusMessage,
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.testTag(UiTags.PATCH_STATUS)
+                    )
                     state.installedVersion?.let {
                         Text("Hook version: $it", style = MaterialTheme.typography.bodySmall)
                     }
@@ -84,15 +89,17 @@ fun PatchScreen(state: PatchUiState, viewModel: MainViewModel, modifier: Modifie
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(
                     onClick = { viewModel.refreshStatus() },
-                    enabled = !state.busy
+                    enabled = !state.busy,
+                    modifier = Modifier.testTag(UiTags.PATCH_REFRESH)
                 ) {
-                    Icon(Icons.Default.Refresh, contentDescription = null)
+                    Icon(Icons.Default.Refresh, contentDescription = "Refresh status")
                     Spacer(Modifier.padding(2.dp))
                     Text("Refresh")
                 }
                 Button(
                     onClick = { viewModel.buildPatch() },
-                    enabled = !state.busy && state.root == true && viewModel.device.supportedDevice
+                    enabled = !state.busy && state.root == true && viewModel.device.supportedDevice,
+                    modifier = Modifier.testTag(UiTags.PATCH_BUILD)
                 ) {
                     Text("Build Patch ZIP")
                 }
@@ -104,7 +111,11 @@ fun PatchScreen(state: PatchUiState, viewModel: MainViewModel, modifier: Modifie
                 Column {
                     LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                     Spacer(Modifier.height(4.dp))
-                    Text(state.progress, style = MaterialTheme.typography.bodySmall)
+                    Text(
+                        state.progress,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.testTag(UiTags.PATCH_PROGRESS)
+                    )
                 }
             }
         }
@@ -116,7 +127,10 @@ fun PatchScreen(state: PatchUiState, viewModel: MainViewModel, modifier: Modifie
                         Text("Patch package", fontWeight = FontWeight.Bold)
                         Text(zip.name, style = MaterialTheme.typography.bodySmall)
                         Spacer(Modifier.height(8.dp))
-                        Button(onClick = { viewModel.exportZip(zip, zip.name) }) {
+                        Button(
+                            onClick = { viewModel.exportZip(zip, zip.name) },
+                            modifier = Modifier.testTag(UiTags.PATCH_EXPORT_ZIP)
+                        ) {
                             Text("Export to Downloads")
                         }
                     }
@@ -131,7 +145,10 @@ fun PatchScreen(state: PatchUiState, viewModel: MainViewModel, modifier: Modifie
                         Text("Stock backup (unpatch)", fontWeight = FontWeight.Bold)
                         Text(backup.name, style = MaterialTheme.typography.bodySmall)
                         Spacer(Modifier.height(8.dp))
-                        OutlinedButton(onClick = { viewModel.exportZip(backup, backup.name) }) {
+                        OutlinedButton(
+                            onClick = { viewModel.exportZip(backup, backup.name) },
+                            modifier = Modifier.testTag(UiTags.PATCH_EXPORT_BACKUP)
+                        ) {
                             Text("Export to Downloads")
                         }
                     }
@@ -149,7 +166,10 @@ fun PatchScreen(state: PatchUiState, viewModel: MainViewModel, modifier: Modifie
         }
 
         item {
-            OutlinedButton(onClick = { viewModel.reboot() }) {
+            OutlinedButton(
+                onClick = { viewModel.reboot() },
+                modifier = Modifier.testTag(UiTags.PATCH_REBOOT)
+            ) {
                 Text("Reboot device")
             }
         }

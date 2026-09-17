@@ -17,6 +17,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 
@@ -38,25 +39,29 @@ fun AppRoot(viewModel: MainViewModel = viewModel()) {
                 NavigationBarItem(
                     selected = tab == FarewellTab.PATCH,
                     onClick = { tab = FarewellTab.PATCH },
-                    icon = { Icon(Icons.Default.Build, contentDescription = null) },
+                    modifier = Modifier.testTag(UiTags.TAB_PATCH),
+                    icon = { Icon(Icons.Default.Build, contentDescription = "Patch") },
                     label = { Text("Patch") }
                 )
                 NavigationBarItem(
                     selected = tab == FarewellTab.RULES,
                     onClick = { tab = FarewellTab.RULES },
-                    icon = { Icon(Icons.AutoMirrored.Filled.List, contentDescription = null) },
+                    modifier = Modifier.testTag(UiTags.TAB_RULES),
+                    icon = { Icon(Icons.AutoMirrored.Filled.List, contentDescription = "Rules") },
                     label = { Text("Rules") }
                 )
                 NavigationBarItem(
                     selected = tab == FarewellTab.DATA,
                     onClick = { tab = FarewellTab.DATA },
-                    icon = { Icon(Icons.Default.Home, contentDescription = null) },
+                    modifier = Modifier.testTag(UiTags.TAB_DATA),
+                    icon = { Icon(Icons.Default.Home, contentDescription = "Data") },
                     label = { Text("Data") }
                 )
                 NavigationBarItem(
                     selected = tab == FarewellTab.SETTINGS,
                     onClick = { tab = FarewellTab.SETTINGS },
-                    icon = { Icon(Icons.Default.Settings, contentDescription = null) },
+                    modifier = Modifier.testTag(UiTags.TAB_SETTINGS),
+                    icon = { Icon(Icons.Default.Settings, contentDescription = "Settings") },
                     label = { Text("Settings") }
                 )
             }
@@ -64,10 +69,10 @@ fun AppRoot(viewModel: MainViewModel = viewModel()) {
     ) { padding ->
         val modifier = Modifier.padding(padding)
         when (tab) {
-            FarewellTab.PATCH -> PatchScreen(state, viewModel, modifier)
-            FarewellTab.RULES -> RulesScreen(state, viewModel, modifier)
-            FarewellTab.DATA -> HomeScreen(state, viewModel, modifier)
-            FarewellTab.SETTINGS -> SettingsScreen(state, viewModel, modifier)
+            FarewellTab.PATCH -> PatchScreen(state, viewModel, modifier.testTag(UiTags.SCREEN_PATCH))
+            FarewellTab.RULES -> RulesScreen(state, viewModel, modifier.testTag(UiTags.SCREEN_RULES))
+            FarewellTab.DATA -> HomeScreen(state, viewModel, modifier.testTag(UiTags.SCREEN_DATA))
+            FarewellTab.SETTINGS -> SettingsScreen(state, viewModel, modifier.testTag(UiTags.SCREEN_SETTINGS))
         }
     }
 }
