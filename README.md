@@ -238,6 +238,21 @@ manifest declares must be listed in `app/src/main/assets/zip/privapp-permissions
 or the platform refuses to boot the package — keep those two files in sync (they currently declare
 `REBOOT` and `WRITE_SECURE_SETTINGS` on top of the normal permissions).
 
+That flag is relaxed in two independent layers, because on these ROMs it is declared in
+**`/vendor/build.prop`** and nowhere else (audited on all three surya ROMs), and `ro.*` is
+write-once — a copy anywhere else would be ignored:
+
+- the **prop map** writes `ro.control_privapp_permissions=log` into the VENDOR map (replace in
+  place, verified against the stock file), and
+- the **installer** re-checks every installed `*build.prop` / `*default.prop` after writing and
+  flips a surviving `=enforce` to `=log` (patch-style flashes only; the restore zip must stay
+  byte-honest to its backup, so it keeps the allowlist XML instead of relaxing the flag).
+
+Trade-off, stated plainly: `log` only downgrades the platform's *reaction* to an unlisted
+privileged permission from "refuse the package" to "log it" — permissions named in an allowlist are
+still granted in both modes. It is a global relaxation (it applies to every system app), which is
+the price of surviving a future MIUI update that requests a permission we have not listed yet.
+
 Safety rails: a restore zip is **refused** when every source of a jar is already patched (a
 "stock" zip built from patched files would restore the patch — the exact thing you would need it
 not to do), and the patch build marks such a source so it never fabricates one silently. When the

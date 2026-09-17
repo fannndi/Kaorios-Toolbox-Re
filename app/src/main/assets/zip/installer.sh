@@ -8,6 +8,9 @@
 #
 OUTFD=/proc/self/fd/$2
 ZIPFILE="$3"
+# Test seam: a prefix for the target tree. Empty in TWRP; the guard test sets it
+# to a temp dir to exercise the real sed against real prop files.
+: "${TARGET_ROOT:=}"
 
 ui_print() {
   while [ "$1" ]; do
@@ -142,6 +145,32 @@ echo "$ENTRIES" | while read entry mode; do
   chown 0:0 "/$entry" 2>/dev/null || chown 0.0 "/$entry" 2>/dev/null
   chmod "${mode:-0644}" "/$entry" 2>/dev/null
 done
+
+# Privileged-app bootloop guard. On MIUI `ro.control_privapp_permissions` is
+# declared in vendor/build.prop as `enforce`, which makes the platform refuse to
+# boot a privileged package whose allowlist does not list every permission it
+# requests. The patched prop map already writes `log`, but this checks the files
+# that were just installed and fixes any survivor, in place, so the value that
+# actually boots is never `enforce`. Only runs for patch-style flashes
+# (backup=yes): a restore zip must stay byte-honest to the backup it came from,
+# and it keeps the allowlist XML instead (see manifestFor), so `enforce` is safe
+# there.
+if [ "$BACKUP" = "yes" ]; then
+  for entry in $FILES; do
+    case "$entry" in
+      */build.prop|*/default.prop) ;;
+      *) continue ;;
+    esac
+    file="$TARGET_ROOT/$entry"
+    if grep -q '^ro\.control_privapp_permissions=enforce' "$file" 2>/dev/null; then
+      if sed -i 's/^ro\.control_privapp_permissions=enforce$/ro.control_privapp_permissions=log/' "$file" 2>/dev/null; then
+        ui_print ":: Privapp guard: /$entry enforce -> log"
+      else
+        ui_print "!! Privapp guard could not rewrite /$entry (still enforce)"
+      fi
+    fi
+  done
+fi
 
 ui_print ":: Clearing caches..."
 rm -rf /data/system/package_cache /data/dalvik-cache/*

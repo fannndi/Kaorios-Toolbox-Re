@@ -194,6 +194,16 @@ object PropSpoof {
             PropPartition.VENDOR -> {
                 map["ro.bootimage.build.fingerprint"] = identity.fingerprint
                 map["ro.adb.secure"] = "1"
+                // The privileged-app safety net. MIUI declares
+                // ro.control_privapp_permissions=enforce in /vendor/build.prop
+                // (audited: all three surya ROMs, no other file), and ro.* is
+                // write-once — so this file is the only place the relaxation can
+                // go, and replacing the value in place is what the patcher does.
+                // `log` keeps a privapp allowlist mismatch from refusing to boot
+                // the package (ours is correct, but a future MIUI update could
+                // add a permission we do not list yet); the platform still grants
+                // every permission the allowlist names.
+                map["ro.control_privapp_permissions"] = "log"
             }
             else -> Unit
         }

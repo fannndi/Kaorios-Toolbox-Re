@@ -505,8 +505,12 @@ class PatchRepository(private val context: Context) {
         builder.append("# stamp=").append(stamp).append('\n')
         builder.append("# profile=").append(device.profile.id).append('\n')
         if (restore) {
-            builder.append("# delete=system_root/system/etc/permissions/privapp-permissions-io.farewell.toolbox.xml")
-            builder.append(",system_root/system/etc/farewell/props.conf")
+            // The allowlist XML is deliberately NOT deleted: the patch/system-app
+            // flashes may have installed this APK into /system/priv-app, and with
+            // ro.control_privapp_permissions=enforce a privileged package with no
+            // allowlist refuses to boot. Keeping the XML (harmless without the
+            // system APK) is what keeps a restore from bricking the boot.
+            builder.append("# delete=system_root/system/etc/farewell/props.conf")
             builder.append(",system_root/system/etc/farewell/keystore_cfg")
             builder.append(",system_root/system/etc/farewell/keybox_cfg\n")
         }

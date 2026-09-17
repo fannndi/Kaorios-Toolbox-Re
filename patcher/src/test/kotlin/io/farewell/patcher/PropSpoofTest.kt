@@ -98,6 +98,23 @@ class PropSpoofTest {
     }
 
     @Test
+    fun vendorRelaxesPrivappEnforcementInTheOnlyFileThatDefinesIt() {
+        // Audited on all three surya ROMs: ro.control_privapp_permissions lives
+        // in /vendor/build.prop and nowhere else, and ro.* is write-once, so a
+        // value in any other partition would be ignored. `log` keeps a privapp
+        // allowlist mismatch from refusing to boot our system-app package.
+        val vendor = PropSpoof.propMapFor(PropPartition.VENDOR, identity)
+
+        assertEquals("log", vendor["ro.control_privapp_permissions"])
+        for (partition in listOf(PropPartition.SYSTEM, PropPartition.PRODUCT, PropPartition.ODM)) {
+            assertNull(
+                "$partition must not carry the vendor prop",
+                PropSpoof.propMapFor(partition, identity)["ro.control_privapp_permissions"]
+            )
+        }
+    }
+
+    @Test
     fun systemCarriesTheHardeningFlags() {
         val system = PropSpoof.propMapFor(PropPartition.SYSTEM, identity)
 
