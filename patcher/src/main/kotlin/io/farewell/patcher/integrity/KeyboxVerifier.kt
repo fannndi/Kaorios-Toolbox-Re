@@ -9,6 +9,8 @@ data class KeyboxReport(
     val chainValid: Boolean,
     val chainLength: Int,
     val rootSubject: String?,
+    /** SHA-256 of the anchoring root, which disambiguates a rotated root that kept its subject. */
+    val rootFingerprint: String?,
     val leafSerialHex: String?,
     val leafRevocation: String?,
     val softBanned: Boolean,
@@ -24,6 +26,7 @@ data class KeyboxReport(
         } else {
             "Chain to Google root: FAILED"
         }
+        rootFingerprint?.let { output += "Root fingerprint: sha256=$it" }
         leafSerialHex?.let { output += "Leaf serial: $it" }
         output += "Revocation: ${leafRevocation ?: "not listed"}"
         attestation?.let { info ->
@@ -94,6 +97,7 @@ object KeyboxVerifier {
                 chainValid = false,
                 chainLength = 0,
                 rootSubject = null,
+                rootFingerprint = null,
                 leafSerialHex = null,
                 leafRevocation = null,
                 softBanned = false,
@@ -108,6 +112,7 @@ object KeyboxVerifier {
                 chainValid = false,
                 chainLength = 0,
                 rootSubject = null,
+                rootFingerprint = null,
                 leafSerialHex = null,
                 leafRevocation = null,
                 softBanned = false,
@@ -138,6 +143,7 @@ object KeyboxVerifier {
         }
 
         var rootSubject: String? = null
+        var rootFingerprint: String? = null
         val last = certificates.last()
         for (root in roots) {
             val anchored = try {
@@ -152,6 +158,7 @@ object KeyboxVerifier {
             }
             if (anchored) {
                 rootSubject = root.subjectX500Principal.name
+                rootFingerprint = AttestationAudit.fingerprint(root)
                 break
             }
         }
@@ -167,7 +174,11 @@ object KeyboxVerifier {
                 warnings += "Certificate $index validity: ${throwable.message}"
             }
             if (index >= 1 && certificate.basicConstraints < 0) {
-                warnings += "Certificate $index is not a CA but is used as issuer"
+                // A detector treats a non-CA issuer as a hard failure
+                // (`chainHasNonCaIssuer`), because it lets an attacker sign a
+                // forged leaf with a genuine end-entity certificate and still
+                // hand back a chain that verifies link by link.
+                problems += "Certificate $index is used as issuer but is not a CA (basicConstraints missing)"
             }
         }
 
@@ -218,6 +229,7 @@ object KeyboxVerifier {
             chainValid = chainValid,
             chainLength = certificates.size,
             rootSubject = rootSubject,
+            rootFingerprint = rootFingerprint,
             leafSerialHex = certificates[0].serialNumber.toString(16),
             leafRevocation = leafRevocation,
             softBanned = leafEntry?.softBanned == true,

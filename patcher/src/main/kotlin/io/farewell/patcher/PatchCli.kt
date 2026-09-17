@@ -2,6 +2,7 @@ package io.farewell.patcher
 
 import com.android.tools.smali.dexlib2.DexFileFactory
 import com.android.tools.smali.dexlib2.Opcodes
+import io.farewell.patcher.integrity.AttestationAudit
 import io.farewell.patcher.integrity.IntegrityData
 import io.farewell.patcher.integrity.KeyboxVerifier
 import io.farewell.patcher.integrity.VerdictParser
@@ -20,6 +21,9 @@ fun main(args: Array<String>) {
     var verifyKeybox: File? = null
     var fetchIntegrity = false
     var decodeVerdict: File? = null
+    var auditAttestation: File? = null
+    var auditChallenge: String? = null
+    var auditPackage: String? = null
     var patchProp: File? = null
     var propsFile: File? = null
     var dumpPropMaps: File? = null
@@ -36,6 +40,9 @@ fun main(args: Array<String>) {
             "--verify-keybox" -> verifyKeybox = File(args[index + 1]).also { index++ }
             "--fetch-integrity" -> fetchIntegrity = true
             "--decode-verdict" -> decodeVerdict = File(args[index + 1]).also { index++ }
+            "--audit-attestation" -> auditAttestation = File(args[index + 1]).also { index++ }
+            "--challenge" -> auditChallenge = args[index + 1].also { index++ }
+            "--package" -> auditPackage = args[index + 1].also { index++ }
             "--patch-prop" -> patchProp = File(args[index + 1]).also { index++ }
             "--props" -> propsFile = File(args[index + 1]).also { index++ }
             "--dump-prop-maps" -> dumpPropMaps = File(args[index + 1]).also { index++ }
@@ -120,6 +127,25 @@ fun main(args: Array<String>) {
         return
     }
 
+    if (auditAttestation != null) {
+        // Audits an attestation chain we served (PEM, leaf first) against PIF
+        // Detector's checks: link signatures, CA issuers, Google-root anchoring,
+        // challenge echo. Run it on a chain dumped from a device so a forgery
+        // failure is seen here before a detector sees it.
+        val snapshot = IntegrityData.download(INTEGRITY_DIR)
+        val chain = AttestationAudit.parsePemChain(auditAttestation.readText())
+        if (chain.isEmpty()) {
+            error("No PEM certificates found in ${auditAttestation.absolutePath}")
+        }
+        val challenge = auditChallenge?.let { hexToBytes(it) }
+        val report = AttestationAudit.audit(chain, snapshot.rootPems, challenge, auditPackage)
+        for (line in report.lines()) {
+            println(line)
+        }
+        println(report.summary())
+        return
+    }
+
     val source = input ?: error("--input is required")
     if (grep != null) {
         grepClasses(source, grep)
@@ -155,6 +181,14 @@ fun main(args: Array<String>) {
     }
     println("Verify: $dexCount dex files, $hookCallCount contain hook calls")
     check(dexCount > 0) { "Output jar has no dex files" }
+}
+
+private fun hexToBytes(text: String): ByteArray {
+    val clean = text.trim().replace(":", "").replace(" ", "")
+    require(clean.length % 2 == 0) { "--challenge must be hex with an even number of digits" }
+    return ByteArray(clean.length / 2) { index ->
+        clean.substring(index * 2, index * 2 + 2).toInt(16).toByte()
+    }
 }
 
 private fun grepClasses(source: File, pattern: Regex) {

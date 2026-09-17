@@ -20,10 +20,12 @@ object DerFixture {
 
     const val TAG_BOOLEAN = 1
     const val TAG_INTEGER = 2
+    const val TAG_BIT_STRING = 3
     const val TAG_OCTET_STRING = 4
     const val TAG_OID = 6
     const val TAG_ENUMERATED = 10
     const val TAG_UTF8_STRING = 12
+    const val TAG_UTC_TIME = 23
     const val TAG_SEQUENCE = 16
     const val TAG_SET = 17
 
@@ -89,6 +91,13 @@ object DerFixture {
     fun enumerated(value: Int): ByteArray = tlv(TAG_ENUMERATED, unsignedContent(value))
 
     fun octetString(bytes: ByteArray): ByteArray = tlv(TAG_OCTET_STRING, bytes)
+
+    /** A BIT STRING with zero unused bits — how certificates carry keys and signatures. */
+    fun bitString(bytes: ByteArray): ByteArray =
+        tlv(TAG_BIT_STRING, byteArrayOf(0) + bytes)
+
+    /** UTCTime as `YYMMDDHHMMSSZ`. */
+    fun utcTime(value: String): ByteArray = tlv(TAG_UTC_TIME, value.toByteArray(Charsets.US_ASCII))
 
     fun utf8(value: String): ByteArray = tlv(TAG_UTF8_STRING, value.toByteArray(Charsets.UTF_8))
 

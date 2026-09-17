@@ -19,7 +19,9 @@ data class AttestationInfo(
     val manufacturer: String?,
     val model: String?,
     val applicationPackages: List<String>,
-    val applicationDigests: List<String>
+    val applicationDigests: List<String>,
+    /** The raw echoed challenge, so a caller can compare it byte for byte. */
+    val challenge: ByteArray? = null
 )
 
 object AttestationParser {
@@ -116,7 +118,8 @@ object AttestationParser {
                 manufacturer = manufacturer,
                 model = model,
                 applicationPackages = applicationPackages,
-                applicationDigests = applicationDigests
+                applicationDigests = applicationDigests,
+                challenge = reader.content(values[4])
             )
         } catch (throwable: Throwable) {
             System.err.println("attestation parse failed: $throwable")
