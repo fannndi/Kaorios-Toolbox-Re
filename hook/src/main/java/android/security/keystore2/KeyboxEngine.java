@@ -3,6 +3,8 @@ package android.security.keystore2;
 import android.content.Context;
 import android.provider.Settings;
 
+import java.io.File;
+
 import java.io.ByteArrayInputStream;
 import java.security.KeyFactory;
 import java.security.KeyPair;
@@ -30,6 +32,7 @@ public final class KeyboxEngine {
     private static volatile String sCachedXml;
     private static volatile Certificate[] sCachedChain;
     private static volatile Material sCachedMaterial;
+    private static volatile KeyboxRevocation sRevocation;
 
     private static final ConcurrentHashMap<String, Entry> sGenerated = new ConcurrentHashMap<>();
 
@@ -99,7 +102,15 @@ public final class KeyboxEngine {
             return null;
         }
         Entry entry = sGenerated.get(alias);
-        return entry != null ? entry.chain : null;
+        if (entry != null) {
+            // If the keybox has been revoked, do not hand the app the spoofed chain.
+            if (sRevocation != null && sRevocation.isRevoked(entry.chain)) {
+                HookLog.w("keybox chain for alias " + alias + " is REVOKED by Google; not serving it");
+                return null;
+            }
+            return entry.chain;
+        }
+        return null;
     }
 
     public static Certificate certificateForAlias(String alias) {
@@ -125,6 +136,14 @@ public final class KeyboxEngine {
             }
             Certificate[] parsed = parseChain(xml);
             if (parsed == null || parsed.length == 0) {
+                return chain;
+            }
+            if (sRevocation == null) {
+                sRevocation = new KeyboxRevocation(new File(context.getFilesDir(), "revocation"));
+            }
+            sRevocation.ensureFresh();
+            if (sRevocation.isRevoked(parsed)) {
+                HookLog.w("keybox chain is REVOKED by Google; serving the real device chain instead");
                 return chain;
             }
             sCachedXml = xml;

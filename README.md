@@ -232,6 +232,9 @@ The `:hook` tests run the device-side DER/attestation builders on the JVM and ro
 |---|---|
 | `DerTest` | `Der.oid` — the high-tag base-128 encoding bug: a single-byte write silently truncated any OID whose leading value reached 128 (e.g. `2.48.x`), so round-trips are asserted through the tooling `DerReader.oid`, plus multi-octet arcs (`2.999.5`) |
 | `AttestationBuilderTest` | `AttestationBuilder.build` produces a real X.509 cert the tooling `AttestationParser` reads back exactly: brand/device/product/manufacturer/model, patch levels (706/718/719), RootOfTrust (locked, boot state, boot hash), challenge length, and `attestationApplicationId`; the cert also verifies against the keybox key that signed it |
+| `KeyboxRevocationTest` | `KeyboxRevocation` — the on-device half of `--verify-keybox`. Parses Google's status list by hand (no `org.json`, so it runs on the JVM), looks the keybox cert serial up by lowercase hex (matching Google's key format, case-insensitive), skips entries without a `status` key, and treats malformed JSON as "no revocation" rather than throwing. The synchronous check is a map lookup; the network fetch is off the critical path (background thread, 24h cache) |
+
+`KeyboxRevocation` is wired into `KeyboxEngine.replaceChain` and `chainForAlias`: if the spoofed keybox's serial is in Google's revoked list, the hook serves the **real device chain** instead. It is best-effort — if the list cannot be fetched or parsed, the check returns "not revoked" and the spoofed chain is served as before, so a transient network failure never silently disables the user's setup.
 
 Fixtures are built in-process with `DexFixture` and `DerFixture`, so the dex and DER tests depend on no ROM extraction. A fixture states a signature or a structure exactly — that is the contract being matched on. The keybox fixtures are two genuine Google attestation roots, fetched from `https://android.googleapis.com/attestation/root`.
 
