@@ -18,6 +18,7 @@ class HookDebugTest {
     @After
     fun resetVerbose() {
         HookLog.setVerboseForTest(null)
+        HookDebug.resetForTest()
     }
 
     @Test

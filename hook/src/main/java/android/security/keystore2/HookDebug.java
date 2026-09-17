@@ -90,6 +90,13 @@ final class HookDebug {
     private static volatile Certificate[] sLastDumpedChain;
     private static volatile boolean sLoggedMissing;
 
+    /** Test-only reset so dump-dedup state cannot leak between tests. */
+    static void resetForTest() {
+        sLastRaw = null;
+        sLastDumpedChain = null;
+        sLoggedMissing = false;
+    }
+
     /** Emit a dump when the config blob changes. Verbose-gated, so quiet by default. */
     static void logOnChange(String raw, HookConfig config) {
         if (raw == null || raw.isEmpty() || raw.equals(sLastRaw)) {
