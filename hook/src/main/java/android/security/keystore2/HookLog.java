@@ -6,13 +6,41 @@ public final class HookLog {
 
     public static final String TAG = "KeyStoreHooks";
 
-    private static final boolean VERBOSE = false;
+    /** Test seam: forces verbose on/off; null means ask the platform. */
+    private static volatile Boolean sVerboseOverride;
 
     private HookLog() {
     }
 
+    /**
+     * Verbose logging is off unless it is switched on for a debug session:
+     *
+     *   adb shell setprop log.tag.KeyStoreHooks DEBUG
+     *
+     * That is the platform's own switch (Log.isLoggable), so it needs no rebuild
+     * and survives until reboot. It used to be a hardcoded `false`, which meant
+     * every debug line was silently discarded even with a device attached.
+     */
+    static boolean verbose() {
+        Boolean override = sVerboseOverride;
+        if (override != null) {
+            return override.booleanValue();
+        }
+        try {
+            return Log.isLoggable(TAG, Log.DEBUG);
+        } catch (Throwable ignored) {
+            // android.util.Log is a stub under the JVM test runtime.
+            return false;
+        }
+    }
+
+    /** Test-only: force the verbose switch without a device. */
+    static void setVerboseForTest(Boolean value) {
+        sVerboseOverride = value;
+    }
+
     public static void d(String message) {
-        if (!VERBOSE) {
+        if (!verbose()) {
             return;
         }
         try {

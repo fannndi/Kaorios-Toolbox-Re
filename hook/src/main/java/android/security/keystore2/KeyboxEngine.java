@@ -118,6 +118,21 @@ public final class KeyboxEngine {
         return chain != null && chain.length > 0 ? chain[0] : null;
     }
 
+    /** Package-private: the current spoofed keybox chain, or null. Diagnostics only. */
+    static Certificate[] cachedChain() {
+        return sCachedChain;
+    }
+
+    /** Package-private: the live revocation checker, or null. Diagnostics only. */
+    static KeyboxRevocation revocation() {
+        return sRevocation;
+    }
+
+    /** Package-private: whether the cached keybox chain is on Google's revoked list. */
+    static boolean isCachedChainRevoked() {
+        return sRevocation != null && sCachedChain != null && sRevocation.isRevoked(sCachedChain);
+    }
+
     public static Certificate[] replaceChain(Certificate[] chain, HookConfig config) {
         try {
             if (config == null || !config.isKeyboxSpoof()) {

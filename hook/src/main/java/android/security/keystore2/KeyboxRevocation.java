@@ -97,6 +97,12 @@ final class KeyboxRevocation {
         return false;
     }
 
+    /** Whether a status list has been loaded. Diagnostics only. */
+    boolean hasStatus() {
+        Map<String, String> status = mStatus;
+        return status != null && !status.isEmpty();
+    }
+
     /** Load the cached list if needed, and refresh it in the background if stale. */
     void ensureFresh() {
         if (mStatus == null) {

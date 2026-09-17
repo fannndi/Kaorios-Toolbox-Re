@@ -34,7 +34,11 @@ public final class HookConfig {
             return EMPTY;
         }
         try {
-            return new HookConfig(new JSONObject(HookCodec.decode(raw)));
+            HookConfig config = new HookConfig(new JSONObject(HookCodec.decode(raw)));
+            // One state dump per config change, verbose-gated: `setprop
+            // log.tag.KeyStoreHooks DEBUG` + `adb logcat -s KeyStoreHooks`.
+            HookDebug.logOnChange(raw, config);
+            return config;
         } catch (Throwable throwable) {
             HookLog.e("bad config json", throwable);
             return EMPTY;
