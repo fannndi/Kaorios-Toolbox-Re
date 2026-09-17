@@ -115,9 +115,38 @@ The app/CLI can verify a keybox against Google's own published data instead of b
 - `https://android.googleapis.com/attestation/root` — Google attestation root certificates (RSA + the new EC "Key Attestation CA1").
 - `https://android.googleapis.com/attestation/status` — Google's revocation list (~1700 revoked keybox serials with `KEY_COMPROMISE` / `SOFTWARE_FLAW` reasons).
 
+**Do not chase `/attestation/crl`.** It does exist and returns `200` (`application/pkix-crl`, PEM X509 CRL), but it is a legacy artifact: issued by `serialNumber=f92009e853b6b045`, `Last Update: Nov 11 2019`, `Next Update: Dec 21 2019`, and it carries **no revoked certificates**. Google clearly moved revocation to the JSON `/attestation/status` list (which is ~1700 entries and refreshes weekly). `/attestation/status` is the authoritative source; the CRL is preserved here only so nobody re-investigates it.
+
+Other Google surfaces, for future ideas (none usable client-side today):
+- **Play Integrity API v1** (`https://playintegrity.googleapis.com/`, discovery returns 200) exposes `v1.decodeIntegrityToken`, `v1.decodePcIntegrityToken` and `deviceRecall.write`. All three need a Google Cloud project + OAuth, so the hook cannot call them — but `decodeIntegrityToken` suggests a real "did my spoof actually pass?" feature: let a user paste their integrity token and decode the verdict server-side. `deviceRecall.write` is a newer device-scoped signal worth tracking, as it may become another thing a spoofed device has to satisfy.
+- Remote Key Provisioning: no public endpoint on `android.googleapis.com` (`/rkp/*` → 404) and no `remoteprovisioning.googleapis.com` / `rkp.googleapis.com`.
+
 `KeyboxVerifier` (pure JVM, in `patcher/integrity/`) rebuilds the certificate chain, verifies every signature, checks it terminates at a Google root, looks up the leaf serial in the revocation list, and parses the attestation extension (`attestationVersion`, security level, verified boot state, device lock, os/vendor/boot patch levels, attested device IDs, attested application id). The app exposes it as **Verify keybox (Google lists)** and reports `valid` / `revoked` / `invalid` with per-field details.
 
 `Toolbox-data/Pif-props.json` ships a current CANARY Pixel fingerprint, auto-updated daily by CI (`Toolbox-Update/scripts/update_pif.sh`), and is bundled in the APK as a fallback when data sync is unavailable.
+
+## 🐞 Debugging on a device (ADB)
+
+Verbose logging is switched on with the platform's own switch, so it needs no rebuild:
+
+```bash
+adb shell setprop log.tag.KeyStoreHooks DEBUG
+adb logcat -s KeyStoreHooks
+```
+
+That turns on every `HookLog.d(...)` line (it used to be a hardcoded `false`, which silently discarded all of them). On each config change the hook then emits a state dump as greppable `key=value` lines, so `adb logcat | grep farewell` answers "did the spoof actually take effect?" in one look:
+
+```
+[farewell] config.present=true
+[farewell] flag.secureFlag=true
+[farewell] keybox.spoof=true
+[farewell] keybox.chain=3
+[farewell] keybox.leafSerial=f1c172a699eaf51d
+[farewell] keybox.revocationKnown=true
+[farewell] keybox.revoked=false
+```
+
+`keybox.chain=-1` / `keybox.leafSerial=unknown` means no keybox has been parsed yet — the usual reason a keybox spoof appears to do nothing. Dumps are emitted once per config change (deduped on the raw blob) and only while verbose is on, so production stays quiet.
 
 ## 🏗️ Modules in detail
 
