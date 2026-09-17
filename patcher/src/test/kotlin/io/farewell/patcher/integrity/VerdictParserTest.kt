@@ -115,4 +115,61 @@ class VerdictParserTest {
         ).joinToString("\n")
         assertTrue(summary.contains("UNRECOGNIZED_VERSION"))
     }
+
+    @Test
+    fun environmentSignalsParseFromTheOfficialShape() {
+        // Newer signals from the discovery document: Play Protect, app access
+        // risk, location spoofing risk, SDK + activity level, testing flag.
+        val verdict = VerdictParser.parse(
+            """{
+              "deviceIntegrity": {
+                "deviceRecognitionVerdict": ["MEETS_STRONG_INTEGRITY"],
+                "deviceAttributes": { "sdkVersion": 31 },
+                "recentDeviceActivity": { "deviceActivityLevel": "LEVEL_2" }
+              },
+              "environmentDetails": {
+                "playProtectVerdict": "NO_ISSUES",
+                "appAccessRiskVerdict": { "appsDetected": ["KNOWN_INSTALLED", "KNOWN_CAPTURING"] },
+                "locationSpoofingRiskVerdict": ["LOW_RISK_DEVICE", "HIGH_RISK_NETWORK"]
+              },
+              "testingDetails": { "isTestingResponse": false }
+            }"""
+        )!!
+        assertEquals(31, verdict.sdkVersion)
+        assertEquals("LEVEL_2", verdict.activityLevel)
+        assertEquals("NO_ISSUES", verdict.playProtectVerdict)
+        assertFalse(verdict.isTestingResponse)
+        val summary = VerdictParser.summarize(verdict).joinToString("\n")
+        assertTrue(summary.contains("Token SDK: 31"))
+        assertTrue("capturing apps must be called out", summary.contains("KNOWN_CAPTURING"))
+        assertTrue("high-risk spoofing signal must be called out", summary.contains("HIGH_RISK_NETWORK"))
+        assertFalse("low-risk entries stay quiet", summary.contains("LOW_RISK_DEVICE"))
+    }
+
+    @Test
+    fun testingResponseIsFlaggedAsMeaningless() {
+        val summary = VerdictParser.summarize(
+            VerdictParser.parse(
+                """{"deviceIntegrity": {"deviceRecognitionVerdict": ["MEETS_STRONG_INTEGRITY"]},
+                    "testingDetails": {"isTestingResponse": true}}"""
+            )!!
+        ).joinToString("\n")
+        assertTrue(summary.contains("TESTING response"))
+    }
+
+    @Test
+    fun virtualAndUnknownVerdictsAreNamed() {
+        val virtual = VerdictParser.summarize(
+            VerdictParser.parse("""{"deviceIntegrity": {"deviceRecognitionVerdict": ["MEETS_VIRTUAL_INTEGRITY"]}}""")!!
+        ).joinToString("\n")
+        assertTrue(virtual.contains("emulator"))
+        assertFalse("emulator verdict is not STRONG", VerdictParser.parse(
+            """{"deviceIntegrity": {"deviceRecognitionVerdict": ["MEETS_VIRTUAL_INTEGRITY"]}}"""
+        )!!.meetsStrong)
+
+        val unknown = VerdictParser.summarize(
+            VerdictParser.parse("""{"deviceIntegrity": {"deviceRecognitionVerdict": ["UNKNOWN"]}}""")!!
+        ).joinToString("\n")
+        assertTrue(unknown.contains("UNKNOWN"))
+    }
 }
