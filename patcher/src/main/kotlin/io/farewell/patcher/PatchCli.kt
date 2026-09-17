@@ -4,6 +4,7 @@ import com.android.tools.smali.dexlib2.DexFileFactory
 import com.android.tools.smali.dexlib2.Opcodes
 import io.farewell.patcher.integrity.IntegrityData
 import io.farewell.patcher.integrity.KeyboxVerifier
+import io.farewell.patcher.integrity.VerdictParser
 import java.io.File
 
 private val INTEGRITY_DIR = File("integrity-data")
@@ -18,6 +19,7 @@ fun main(args: Array<String>) {
     var grep: Regex? = null
     var verifyKeybox: File? = null
     var fetchIntegrity = false
+    var decodeVerdict: File? = null
     var patchProp: File? = null
     var propsFile: File? = null
     var dumpPropMaps: File? = null
@@ -33,6 +35,7 @@ fun main(args: Array<String>) {
             "--grep" -> grep = Regex(args[index + 1], RegexOption.IGNORE_CASE).also { index++ }
             "--verify-keybox" -> verifyKeybox = File(args[index + 1]).also { index++ }
             "--fetch-integrity" -> fetchIntegrity = true
+            "--decode-verdict" -> decodeVerdict = File(args[index + 1]).also { index++ }
             "--patch-prop" -> patchProp = File(args[index + 1]).also { index++ }
             "--props" -> propsFile = File(args[index + 1]).also { index++ }
             "--dump-prop-maps" -> dumpPropMaps = File(args[index + 1]).also { index++ }
@@ -91,6 +94,18 @@ fun main(args: Array<String>) {
             println(line)
         }
         println(report.summary())
+        return
+    }
+
+    if (decodeVerdict != null) {
+        // The raw integrity token is encrypted and only Google's server can open
+        // it (Cloud project + OAuth). This reads the *decrypted* verdict JSON
+        // returned by v1.decodeIntegrityToken and answers "did my spoof pass?".
+        val verdict = VerdictParser.parse(decodeVerdict.readText())
+            ?: error("Could not parse ${decodeVerdict.absolutePath} as a verdict JSON")
+        for (line in VerdictParser.summarize(verdict)) {
+            println(line)
+        }
         return
     }
 
