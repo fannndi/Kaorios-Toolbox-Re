@@ -31,6 +31,9 @@ public final class HookConfig {
 
     public static HookConfig parse(String raw) {
         if (raw == null || raw.isEmpty()) {
+            // Nothing pushed to the device yet — the most common reason a spoof
+            // does nothing, so make sure it is visible instead of silent.
+            HookDebug.logMissing();
             return EMPTY;
         }
         try {

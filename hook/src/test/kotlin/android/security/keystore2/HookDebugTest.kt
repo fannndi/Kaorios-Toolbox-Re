@@ -60,6 +60,23 @@ class HookDebugTest {
     }
 
     @Test
+    fun theNoConfigCaseIsVisibleNotSilent() {
+        // parse() returns early for a null/empty blob, so without logMissing() the
+        // single most common failure ("nothing has been pushed yet") produced no
+        // output at all. The dump has to say config.present=false and chain=-1.
+        val dump = HookDebug.dump(HookDebug.Snapshot())
+        assertTrue(dump.contains("[farewell] config.present=false"))
+        assertTrue(dump.contains("[farewell] keybox.chain=-1"))
+        assertTrue(dump.contains("[farewell] keybox.leafSerial=unknown"))
+
+        // Must not throw on the JVM: android.util.Log is a stub, and logMissing()
+        // is called from the real config path.
+        HookLog.setVerboseForTest(true)
+        HookDebug.logMissing()
+        HookDebug.logMissing() // second call is deduped, still no throw
+    }
+
+    @Test
     fun verboseIsOffUnlessSwitchedOn() {
         // android.util.Log is a stub here, so the platform answer is unavailable and
         // the default must stay quiet.

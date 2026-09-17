@@ -157,12 +157,16 @@ That turns on every `HookLog.d(...)` line (it used to be a hardcoded `false`, wh
 
 `keybox.chain=-1` / `keybox.leafSerial=unknown` means no keybox has been parsed yet — the usual reason a keybox spoof appears to do nothing.
 
-A dump is emitted at both moments that matter, so switching verbose on mid-session still shows the current state rather than staying silent until something changes:
+A dump is emitted at every moment that matters, so switching verbose on mid-session still shows the current state rather than staying silent until something changes:
 
-- when the **config blob changes** (deduped on the raw blob), and
-- when a **new keybox chain is parsed** (deduped on the chain instance).
+- when the **config blob changes** (deduped on the raw blob),
+- when a **new keybox chain is parsed** (deduped on the chain instance), and
+- when there is **no config at all** — reported once as `config.present=false` with
+  `keybox.chain=-1`. This case used to be completely silent (parse returns early
+  for a null blob) even though it is the single most common reason a spoof does
+  nothing, so it is called out explicitly.
 
-Both are verbose-gated, so production stays quiet.
+All three are verbose-gated, so production stays quiet.
 
 ## 🏗️ Modules in detail
 

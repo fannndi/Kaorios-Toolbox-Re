@@ -88,6 +88,7 @@ final class HookDebug {
 
     private static volatile String sLastRaw;
     private static volatile Certificate[] sLastDumpedChain;
+    private static volatile boolean sLoggedMissing;
 
     /** Emit a dump when the config blob changes. Verbose-gated, so quiet by default. */
     static void logOnChange(String raw, HookConfig config) {
@@ -95,7 +96,25 @@ final class HookDebug {
             return;
         }
         sLastRaw = raw;
+        sLoggedMissing = false;
         HookLog.d("config changed, state dump:\n" + dump(fromConfig(config)));
+    }
+
+    /**
+     * Dump the "no config at all" state.
+     *
+     * parse() returns early for a null/empty blob, so this case would otherwise be
+     * completely silent — and it is the single most common reason a spoof appears
+     * to do nothing. Reported once per missing-config streak; seeing
+     * `config.present=false` with `keybox.chain=-1` says immediately that nothing
+     * has been pushed to the device yet.
+     */
+    static void logMissing() {
+        if (!HookLog.verbose() || sLoggedMissing) {
+            return;
+        }
+        sLoggedMissing = true;
+        HookLog.d("no config found, state dump:\n" + dump(new Snapshot()));
     }
 
     /**
