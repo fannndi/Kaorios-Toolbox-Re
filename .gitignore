@@ -33,6 +33,7 @@ Thumbs.db
 
 # Local test artifacts
 build-logs/
+__pycache__/
 
 # Integrity data cache
 integrity-data/
