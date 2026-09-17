@@ -1,6 +1,7 @@
 package io.farewell.toolbox.core
 
 import android.content.Context
+import io.farewell.patcher.integrity.PifVersion
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -26,6 +27,7 @@ object DataSync {
         }
         val dataDir = File(context.filesDir, "farewell-data").apply { mkdirs() }
         var downloaded = 0
+        var kept = 0
         for (name in files) {
             val target = File(dataDir, name)
             try {
@@ -35,10 +37,28 @@ object DataSync {
                 }
                 connection.connect()
                 if (connection.responseCode == 200) {
-                    connection.inputStream.use { input ->
-                        target.outputStream().use { output -> input.copyTo(output) }
+                    if (name == "Pif-props.json") {
+                        // A source that went backwards (failed CI scrape, an
+                        // older branch overwriting the JSON) must never replace
+                        // a fresher fingerprint: Play Integrity reads the patch
+                        // level, and on Android 13+ STRONG needs a recent one.
+                        val temp = File(dataDir, "Pif-props.json.tmp")
+                        connection.inputStream.use { input ->
+                            temp.outputStream().use { output -> input.copyTo(output) }
+                        }
+                        if (PifVersion.isCandidateStale(currentPif(context, dataDir), temp.readText())) {
+                            temp.delete()
+                            kept++
+                        } else {
+                            temp.renameTo(target)
+                            downloaded++
+                        }
+                    } else {
+                        connection.inputStream.use { input ->
+                            target.outputStream().use { output -> input.copyTo(output) }
+                        }
+                        downloaded++
                     }
-                    downloaded++
                 }
                 connection.disconnect()
             } catch (throwable: Throwable) {
@@ -49,8 +69,18 @@ object DataSync {
         if (downloaded == 0) {
             DataSyncResult(false, "No files downloaded from $baseUrl", version)
         } else {
-            DataSyncResult(true, "$downloaded/${files.size} files updated", version)
+            val keptNote = if (kept > 0) ", $kept kept (server copy is older)" else ""
+            DataSyncResult(true, "$downloaded/${files.size} files updated$keptNote", version)
         }
+    }
+
+    /** Newest PIF already on the device: the synced copy, else the bundled one. */
+    private fun currentPif(context: Context, dataDir: File): String? {
+        val synced = File(dataDir, "Pif-props.json").takeIf { it.exists() }?.readText()
+        if (synced != null) return synced
+        return runCatching {
+            context.assets.open("Pif-props.json").use { it.readBytes().toString(Charsets.UTF_8) }
+        }.getOrNull()
     }
 
     fun cachedVersion(context: Context): String? {

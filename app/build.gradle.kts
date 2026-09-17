@@ -14,10 +14,15 @@ android {
         versionCode = 1
         versionName = "1.0.0"
 
+        // Published Toolbox-data raw URL. This repo, `fork` branch: `main`'s
+        // Pif-props.json is stale (a 2025 fingerprint), and syncing it would
+        // replace the bundled CANARY PIF with an older one. DataSync also
+        // refuses an older SECURITY_PATCH outright (PifVersion guard), so a
+        // stale source can never downgrade the device.
         buildConfigField(
             "String",
             "DATA_BASE_URL",
-            "\"https://raw.githubusercontent.com/fannndi/Farewell-Toolbox/main/Toolbox-data\""
+            "\"https://raw.githubusercontent.com/fannndi/Kaorios-Toolbox-Re/fork/Toolbox-data\""
         )
     }
 

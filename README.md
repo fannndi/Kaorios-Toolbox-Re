@@ -168,6 +168,25 @@ A dump is emitted at every moment that matters, so switching verbose on mid-sess
 
 All three are verbose-gated, so production stays quiet.
 
+### Rootless capability matrix (measured on surya, MIUI 12 / Android 10)
+
+"Rootless" in this project means the patch itself needs no Magisk/Zygisk at runtime — but the
+setup path does use `su` for three shell helpers (reading the system jars, writing config,
+running `farewelld`). Measured on a real stock surya via `run-as` (app UID) and `adb shell`
+(shell UID), so the boundary is known before designing a no-root flow:
+
+| Resource | app UID | shell UID | Notes |
+|---|---|---|---|
+| `/system/framework/framework.jar`, `services.jar` | ✅ read | ✅ read | The app can pull and patch jars with **no root at all** |
+| `/system/build.prop`, `/product/build.prop`, `/vendor/build.prop`, `/vendor/default.prop` | ❌ | ❌ | SELinux denies both; only root or recovery can read them |
+| `/vendor/build_<sku>.prop`, `/vendor/odm/etc/build_*.prop` | ✅ (odm file) | ✅ | vendor-labelled files are readable |
+| `settings put global` (config blobs) | ❌ | ✅ | PC `adb shell` writes them fine; a custom recovery can ship them in the zip |
+
+Consequences: a no-root flow can patch jars in-app and export the zips, but the property layer
+needs either recovery (TWRP: pull the prop files, flash the patched ones back) or root. Shizuku
+does not change this on Android 10 — it needs USB re-activation after every reboot there, and
+the shell UID it grants still cannot read `build.prop` or write `/system`.
+
 ## 🏗️ Modules in detail
 
 ### `app/` — Farewell Toolbox APK
@@ -177,7 +196,7 @@ All three are verbose-gated, so production stays quiet.
   - `PatchRepository` — device detection + jar patching (`JarPatcher` from `:patcher`) + flashable zip assembly.
   - `PlayIntegritySetup` — builds/writes the `sys_keystore_cfg` blob and per-flag toggles.
   - `IntegrityCheck` — keybox verification against Google lists (reuses `:patcher`'s `KeyboxVerifier`/`IntegrityData`).
-  - `DataSync` — downloads `Toolbox-data/*` (Pif-props, device-model, app-props, blacklist, quotes, date) from the configured base URL; the APK bundles a fallback copy.
+  - `DataSync` — downloads `Toolbox-data/*` (Pif-props, device-model, app-props, blacklist, quotes, date) from the configured base URL; the APK bundles a fallback copy. The base URL points at this repo's `fork` branch (the `main` copy is stale — a 2025 fingerprint), and a sync **never moves the PIF backwards**: `PifVersion` rejects a downloaded `SECURITY_PATCH` older than the one already on the device, so a stale source cannot downgrade the spoof even if the URL changes later.
   - `PifAutoFetch` — scrapes `developer.android.com/about/versions` to build a fresh PIF fingerprint when sync data is stale.
   - `AutoRefresh` — `JobScheduler` job (every 6 h) that re-applies PIF config / refreshes the native helper.
   - `NativeService` / `NativeBootReceiver` / `RootShell` — stream `farewelld` + `props.conf` to `/data/local/tmp/pfix` over `su -c` and run it (`--once`) at boot, manually, or after a refresh.
@@ -285,6 +304,7 @@ pwsh -File native/build.ps1                         # build farewelld (arm64-v8a
 | `PropSpoofTest` | the per-partition prop maps: every partition gets its own prefix, only `/system/build.prop` carries the unprefixed keys, vendor adds the bootimage fingerprint and `ro.adb.secure`, unusable identities produce nothing, and no map ever contains a blank value (which would erase a stock property) |
 | `FlashZipBuilderTest` | the flashable zip: template and payload entries, binary payloads preserved byte for byte, LF-only scripts untouched, and the entry-name contract the shell installer depends on (`system_root/...` for system, native paths for the other partitions, first path segment = mount point) |
 | `IntegrityDataTest` | the Google cache and parsing: the 24-hour max-age, roots from a JSON array, statuses from `entries` with optional `reason`/`comment`/`expires`, entries without a `status` skipped, and malformed JSON yielding empty results instead of throwing |
+| `PifVersionTest` | the sync staleness guard: an older `SECURITY_PATCH` is rejected, equal or newer is accepted, and unreadable input never blocks the sync (a device test caught a data source serving a PIF a year older than the bundled one) |
 | `VerdictParserTest` | the decrypted `decodeIntegrityToken` verdict, pinned against the official discovery schema: STRONG implies DEVICE/BASIC, DEVICE without STRONG and BASIC-only are distinguished, an empty verdict list reads as unevaluated (never BASIC), VIRTUAL/UNKNOWN/testing responses are named, environment signals (Play Protect, app-access risk, location-spoofing risk, SDK, activity level) surface, replay-cleared verdicts (same token decrypted twice) are diagnosed as token reuse, missing STRONG can mean never-opted-in, raw JWE tokens are detected with the decrypt recipe, and malformed input yields null instead of throwing |
 
 The `:hook` tests run the device-side DER/attestation builders on the JVM and round-trip them through the tooling-side `AttestationParser`, so the encoder the hook ships and the parser the desktop tool reads are covered by one contract (the hook test source set compiles at JVM 17 because it consumes `:patcher`, which is JVM 17; the hook device code stays at Java 11):
