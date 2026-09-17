@@ -366,6 +366,7 @@ The **Rules** tab is where those per-app rules are authored. It writes all four 
 - 🔓 Disable FLAG_SECURE (screenshots & screen recording in restricted apps).
 - ⚙️ Per-app spoof rules: Settings value overrides, hidden keys, forced system features and installer-source spoof (framework patch required).
 - 🧾 Keybox verification against Google's own root/revocation lists.
+- 🔍 Decrypted-verdict reader ("did my spoof pass?"): paste the `decodeIntegrityToken` JSON in Settings or `--decode-verdict` on the CLI — STRONG/DEVICE/BASIC plus environment signals, replay-clearing and opt-in traps diagnosed.
 - 🧯 Flash-time backup + one-flash stock restore zip.
 
 ## 🗺️ Roadmap

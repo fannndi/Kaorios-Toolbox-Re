@@ -63,6 +63,8 @@ object UiTags {
     const val SETTINGS_VERDICT_DEVICE = "settings.verdict.device"
     const val SETTINGS_VERDICT_STRONG = "settings.verdict.strong"
     const val SETTINGS_VERDICT_ANALYZE = "settings.verdict.analyze"
+    const val SETTINGS_VERDICT_JSON = "settings.verdict.json"
+    const val SETTINGS_VERDICT_JSON_ANALYZE = "settings.verdict.json.analyze"
     const val SETTINGS_REFRESH = "settings.refresh"
     const val SETTINGS_REBOOT = "settings.reboot"
 }

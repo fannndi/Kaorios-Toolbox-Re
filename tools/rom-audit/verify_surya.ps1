@@ -122,6 +122,18 @@ try {
         } else {
             Fail("${label}: no Report line in patcher output")
         }
+        # The counts say rules fired; this proves the hook dex actually landed
+        # in the output jar (a rewrite without the injected dex would still
+        # report "applied" for return-value rules).
+        if ($clean -match "Verify:\s+(\d+) dex files,\s+(\d+) contain hook calls") {
+            if ([int]$Matches[2] -lt 1) {
+                Fail("${label}: patched jar has no dex containing hook calls")
+            } else {
+                Write-Host "   OK: $($Matches[2]) dex file(s) contain hook calls"
+            }
+        } else {
+            Fail("${label}: no Verify line in patcher output")
+        }
     }
 } finally {
     Pop-Location

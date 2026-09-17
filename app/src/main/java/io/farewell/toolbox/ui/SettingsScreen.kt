@@ -14,6 +14,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -163,6 +164,31 @@ fun SettingsScreen(state: PatchUiState, viewModel: MainViewModel, modifier: Modi
                     modifier = Modifier.padding(top = 8.dp).testTag(UiTags.SETTINGS_VERDICT_ANALYZE)
                 ) {
                     Text("Analyze verdict")
+                }
+            }
+        }
+
+        Card(modifier = Modifier.fillMaxWidth()) {
+            Column(Modifier.padding(16.dp)) {
+                Text("Decode verdict JSON", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(
+                    "Decrypt your integrity token server-side (Play Console project + OAuth), then paste the tokenPayloadExternal JSON here.",
+                    style = MaterialTheme.typography.bodySmall
+                )
+                var verdictJson by remember { mutableStateOf("") }
+                OutlinedTextField(
+                    value = verdictJson,
+                    onValueChange = { verdictJson = it },
+                    label = { Text("Verdict JSON") },
+                    minLines = 3,
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp).testTag(UiTags.SETTINGS_VERDICT_JSON)
+                )
+                Button(
+                    onClick = { viewModel.analyzeVerdictJson(verdictJson) },
+                    enabled = !state.busy,
+                    modifier = Modifier.padding(top = 8.dp).testTag(UiTags.SETTINGS_VERDICT_JSON_ANALYZE)
+                ) {
+                    Text("Decode verdict")
                 }
             }
         }

@@ -3,6 +3,7 @@ package io.farewell.toolbox.core
 import android.content.Context
 import io.farewell.patcher.integrity.IntegrityData
 import io.farewell.patcher.integrity.KeyboxVerifier
+import io.farewell.patcher.integrity.VerdictParser
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -37,8 +38,7 @@ object IntegrityCheck {
         }.getOrDefault(0)
     }
 
-    fun compareVerdict(context: Context, basic: Boolean, device: Boolean, strong: Boolean): String {
-        val lines = mutableListOf<String>()
+    fun compareVerdict(context: Context, basic: Boolean, device: Boolean, strong: Boolean): String {        val lines = mutableListOf<String>()
         val keybox = PlayIntegritySetup.keyboxImported(context)
         val pif = PlayIntegritySetup.loadPif(context)
         val patch = pif?.optString("SECURITY_PATCH", "").orEmpty()
@@ -72,8 +72,32 @@ object IntegrityCheck {
         return lines.joinToString("\n")
     }
 
-    suspend fun readinessReport(context: Context): String = withContext(Dispatchers.IO) {
-        val lines = mutableListOf<String>()
+    /**
+     * "Did my spoof pass?" from a decrypted verdict. The raw integrity token is
+     * encrypted (JWE) and only Google's server can open it, so the user decodes
+     * it on their own Play Console project and pastes the tokenPayloadExternal
+     * JSON here. Pure string in/out, so the CLI and the app share the wording
+     * through [VerdictParser].
+     */
+    fun decodeVerdictJson(text: String): String {
+        val pasted = text.trim()
+        if (pasted.isEmpty()) {
+            return "Paste the decrypted decodeIntegrityToken JSON first."
+        }
+        if (VerdictParser.looksLikeRawToken(pasted)) {
+            return listOf(
+                "That is a RAW encrypted token - only Google's server can open it.",
+                "Decrypt it (POST https://playintegrity.googleapis.com/v1/PACKAGE_NAME:decodeIntegrityToken",
+                "with a service-account OAuth token), then paste the tokenPayloadExternal JSON here.",
+                "Decrypt each token exactly once: re-decrypting clears every verdict."
+            ).joinToString("\n")
+        }
+        val verdict = VerdictParser.parse(pasted)
+            ?: return "Not a verdict JSON. Decrypt the token server-side first, then paste the JSON here."
+        return VerdictParser.summarize(verdict).joinToString("\n")
+    }
+
+    suspend fun readinessReport(context: Context): String = withContext(Dispatchers.IO) {        val lines = mutableListOf<String>()
         lines += "Play Integrity STRONG readiness"
         val sdk = android.os.Build.VERSION.SDK_INT
         if (sdk >= 33) {

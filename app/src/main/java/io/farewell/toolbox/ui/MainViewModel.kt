@@ -282,6 +282,13 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun analyzeVerdictJson(text: String) {
+        viewModelScope.launch {
+            val message = IntegrityCheck.decodeVerdictJson(text)
+            _state.update { it.copy(integrationMessage = message, log = it.log + message) }
+        }
+    }
+
     fun verifyKeybox() {
         viewModelScope.launch {
             _state.update { it.copy(busy = true, progress = "Checking keybox against Google lists...") }
