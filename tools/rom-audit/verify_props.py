@@ -205,6 +205,23 @@ def main() -> int:
         print("  {:<{w}} {:<44} {:<12} {}".format(
             key, value[:42], status, source, w=width))
 
+    # Compatibility prop: the installer guard and the prop map both relax MIUI's
+    # privileged-permission enforcement, because our system-app install would
+    # otherwise be at the mercy of an allowlist mismatch. Assert it resolved to
+    # `log` from the file that actually defines it (vendor on all three ROMs).
+    compat_key = "ro.control_privapp_permissions"
+    compat_entry = resolver.winners.get(compat_key)
+    compat_value = compat_entry[0] if compat_entry else ""
+    compat_source = compat_entry[1] if compat_entry else "-"
+    print()
+    print("COMPATIBILITY KEY")
+    print("  {:<34} {:<10} {}".format(compat_key, compat_value or "unset", compat_source))
+    if compat_value != "log":
+        failures += 1
+        print("  RESULT                 : FAIL (privapp enforcement not relaxed)")
+    else:
+        print("  RESULT                 : PASS")
+
     print()
     print("SUMMARY")
     print("  property files patched : {}".format(touched))
@@ -214,7 +231,6 @@ def main() -> int:
     else:
         print("  RESULT                 : PASS")
         print("                           no identity key resolves to a stock value")
-
     if args.json:
         with open(args.json, "w", encoding="utf-8") as handle:
             json.dump(resolved, handle, indent=2)

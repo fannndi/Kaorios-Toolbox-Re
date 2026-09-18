@@ -478,7 +478,12 @@ pwsh -File tools/rom-audit/verify_surya.ps1 `
 
 It asserts the exact dex counts (14/6 on MIUI 12, 15/6 on MIUI 13/14, always
 0 skipped — a rule that silently stops firing on a ROM breaks the count) and
-the prop proof below, exiting non-zero on any regression.
+the prop proof below, exiting non-zero on any regression. It also asserts the
+compatibility key `ro.control_privapp_permissions` resolves to `log`; the winner
+is `vendor/build_<sku>.prop` (the per-SKU file is imported last and the key is
+appended there exactly once), with the in-place replacement in
+`vendor/build.prop` as the second writer — both are `log`, so the boot value is
+deterministic on all three ROMs.
 
 The three `tools/rom-audit/` scripts answer, in order: what the ROM contains, who wins each property key, and whether the spoof actually survives. `verify_props.py` drives the real patcher and the real maps against a copy of the ROM tree:
 
