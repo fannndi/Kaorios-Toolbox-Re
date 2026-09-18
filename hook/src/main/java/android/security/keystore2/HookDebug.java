@@ -34,6 +34,8 @@ final class HookDebug {
         /** Whether the revocation status list has been loaded. */
         boolean revocationKnown;
         boolean keyboxRevoked;
+        /** `current` when the chain's root is one of Google's published roots. */
+        String keyboxAnchor = "unknown";
     }
 
     private HookDebug() {
@@ -50,6 +52,7 @@ final class HookDebug {
         line(b, "keybox.leafSerial", s.keyboxLeafSerial.isEmpty() ? "unknown" : s.keyboxLeafSerial);
         line(b, "keybox.revocationKnown", String.valueOf(s.revocationKnown));
         line(b, "keybox.revoked", String.valueOf(s.keyboxRevoked));
+        line(b, "keybox.anchor", s.keyboxAnchor);
         return b.toString();
     }
 
@@ -75,6 +78,7 @@ final class HookDebug {
         Certificate[] chain = KeyboxEngine.cachedChain();
         if (chain != null && chain.length > 0) {
             s.keyboxChainLength = chain.length;
+            s.keyboxAnchor = KeyboxAnchor.label(chain);
             if (chain[0] instanceof X509Certificate) {
                 s.keyboxLeafSerial =
                         ((X509Certificate) chain[0]).getSerialNumber().toString(16).toLowerCase();

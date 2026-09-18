@@ -179,6 +179,17 @@ public final class KeyboxEngine {
             }
             sCachedXml = xml;
             sCachedChain = parsed;
+            // A chain can be internally perfect yet end at a retired root: the
+            // retired and current RSA roots share a subject, so only the
+            // fingerprint tells them apart, and Google rejects the retired one
+            // server-side. Surface it instead of letting the verdict fail
+            // silently.
+            String anchor = KeyboxAnchor.label(parsed);
+            if (!"current".equals(anchor)) {
+                HookLog.w("keybox anchor: " + anchor + " root (sha256="
+                        + KeyboxAnchor.fingerprint(parsed[parsed.length - 1])
+                        + ") - Google will likely reject this attestation");
+            }
             // Diagnostics: is the keybox loaded, and has Google revoked it?
             HookDebug.logKeybox(config);
             return parsed;

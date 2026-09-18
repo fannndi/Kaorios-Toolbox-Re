@@ -164,9 +164,10 @@ That turns on every `HookLog.d(...)` line (it used to be a hardcoded `false`, wh
 [farewell] keybox.leafSerial=f1c172a699eaf51d
 [farewell] keybox.revocationKnown=true
 [farewell] keybox.revoked=false
+[farewell] keybox.anchor=current
 ```
 
-`keybox.chain=-1` / `keybox.leafSerial=unknown` means no keybox has been parsed yet — the usual reason a keybox spoof appears to do nothing.
+`keybox.chain=-1` / `keybox.leafSerial=unknown` means no keybox has been parsed yet — the usual reason a keybox spoof appears to do nothing. `keybox.anchor` distinguishes `current` from `retired`: a keybox can chain perfectly to a root Google has **retired** (the retired and current RSA roots share the subject `serialNumber=f92009e853b6b045`, so only the fingerprint tells them apart), and only the server rejects it — the exact failure mode documented after the 2022 rotation. The two current root fingerprints are embedded in `KeyboxAnchor`; a retired root still gets served (refusing could disable a valid-looking setup), but it is logged and shown here as the fastest explanation for "pipeline healthy, verdict BASIC/empty".
 
 A dump is emitted at every moment that matters, so switching verbose on mid-session still shows the current state rather than staying silent until something changes:
 
@@ -442,6 +443,7 @@ The `:hook` tests run the device-side DER/attestation builders on the JVM and ro
 | `KeyboxEngineRevocationTest` | The integration the other two miss: `KeyboxEngine.chainForAlias` gates the spoofed keybox chain on `KeyboxRevocation`. Wires a `KeyboxRevocation` backed by a disk cache (no network) and a generated alias entry via reflection, then asserts `chainForAlias` returns **null** (so the caller serves the real device chain) when the serial is revoked, and returns the exact spoofed chain when it is not. Closes the loop between the two classes without a device |
 | `HookDebugTest` | The ADB debug path: `dump` exposes every field as greppable `[farewell] key=value` lines, the no-config state reads `config.present=false` with `keybox.chain=-1` instead of staying silent, and verbose stays off unless the platform switch (or test seam) turns it on |
 | `HookConfigFileTest` | The rootless config channel: `ConfigFile.read` returns the provisioned blob, missing/empty files read as null (never an empty config), and the three `/system/etc/farewell/` paths the installer writes are pinned |
+| `KeyboxAnchorTest` | The retired-root trap: the embedded SHA-256 constants must match the **real** Google roots (fixtures reused from the patcher test resources), a forged leaf is labelled `retired`, the root is read from the last certificate, and nothing-to-inspect is `unknown` — never silently `current` |
 
 `KeyboxRevocation` is wired into `KeyboxEngine.replaceChain` and `chainForAlias`: if the spoofed keybox's serial is in Google's revoked list, the hook serves the **real device chain** instead. It is best-effort — if the list cannot be fetched or parsed, the check returns "not revoked" and the spoofed chain is served as before, so a transient network failure never silently disables the user's setup.
 

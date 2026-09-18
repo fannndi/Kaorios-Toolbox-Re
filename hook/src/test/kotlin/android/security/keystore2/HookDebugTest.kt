@@ -33,6 +33,7 @@ class HookDebugTest {
             keyboxLeafSerial = "f1c172a699eaf51d"
             revocationKnown = true
             keyboxRevoked = false
+            keyboxAnchor = "current"
         }
         val dump = HookDebug.dump(s)
         // `adb logcat | grep farewell` has to show each fact on its own key=value line.
@@ -45,9 +46,10 @@ class HookDebugTest {
         assertTrue(dump.contains("[farewell] keybox.leafSerial=f1c172a699eaf51d"))
         assertTrue(dump.contains("[farewell] keybox.revocationKnown=true"))
         assertTrue(dump.contains("[farewell] keybox.revoked=false"))
+        assertTrue(dump.contains("[farewell] keybox.anchor=current"))
 
         // One line per field, so a dump of N fields is N lines.
-        assertEquals("one line per field", 9, dump.lines().size)
+        assertEquals("one line per field", 10, dump.lines().size)
     }
 
     @Test
