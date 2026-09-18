@@ -7,9 +7,13 @@
     <!-- Privileged-only, granted when the patch zip installs this APK into
          /system/priv-app (see zip/privapp-permissions-io.farewell.toolbox.xml):
          REBOOT gives reboot-to-recovery with no root, WRITE_SECURE_SETTINGS makes
-         the config channel rootless too. Both are ignored on a normal install. -->
+         the config channel rootless, FORCE_STOP_PACKAGES + CLEAR_APP_USER_DATA
+         make "Refresh + clear Play Store" rootless. All are ignored on a normal
+         install. -->
     <uses-permission android:name="android.permission.REBOOT" />
     <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" />
+    <uses-permission android:name="android.permission.FORCE_STOP_PACKAGES" />
+    <uses-permission android:name="android.permission.CLEAR_APP_USER_DATA" />
 
     <application
         android:name=".FarewellApp"

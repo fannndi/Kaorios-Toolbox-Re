@@ -63,7 +63,7 @@ fun PatchScreen(state: PatchUiState, viewModel: MainViewModel, modifier: Modifie
                         Text("Hook version: $it", style = MaterialTheme.typography.bodySmall)
                     }
                     Text(
-                        "Root: ${if (state.root == true) "granted" else if (state.root == false) "unavailable" else "checking..."}",
+                        "Root: ${if (state.root == true) "granted" else if (state.root == false) "unavailable (optional)" else "checking..."}",
                         style = MaterialTheme.typography.bodySmall
                     )
                     Text(

@@ -95,9 +95,18 @@ object PlayIntegritySetup {
         if (!applied.ok) {
             return@withContext applied
         }
-        RootShell.run("am force-stop com.google.android.gms.unstable; am force-stop com.google.android.gms", 60)
-        RootShell.run("pm clear com.android.vending", 120)
-        PlayIntegrityResult(true, "${applied.message}. $syncNote. GMS/Play Store refreshed")
+        // Rootless first: a privileged install runs am/pm under its own uid and
+        // the platform grants FORCE_STOP_PACKAGES / CLEAR_APP_USER_DATA from the
+        // allowlist. Root is only the fallback; with neither, say what to do.
+        val stoppedGms = RootShell.forceStop(context, "com.google.android.gms.unstable") and
+            RootShell.forceStop(context, "com.google.android.gms")
+        val clearedStore = RootShell.clearData(context, "com.android.vending")
+        val refreshNote = when {
+            stoppedGms && clearedStore -> "GMS/Play Store refreshed"
+            stoppedGms -> "GMS restarted; clear Play Store from Settings > Apps to finish"
+            else -> "restart DroidGuard and clear Play Store manually (no root, not privileged yet)"
+        }
+        PlayIntegrityResult(true, "${applied.message}. $syncNote. $refreshNote")
     }
 
     fun keyboxImported(context: Context): Boolean = activeKeyboxFile(context).exists()

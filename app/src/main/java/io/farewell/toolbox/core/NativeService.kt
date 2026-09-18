@@ -61,7 +61,11 @@ object NativeService {
         val started = System.currentTimeMillis()
         val outcome = runCatching {
             if (!RootShell.isRootAvailable()) {
-                error("root access unavailable")
+                // The one layer that genuinely needs root in stock mode: it
+                // writes the property areas directly. The rootless equivalent is
+                // ROM mode (bake native/rom/ into the ROM); everything else in
+                // this app works without root.
+                error("no root: native layer needs stock-root or ROM mode (Java hook still covers target processes)")
             }
             val binary = context.assets.open(HELPER_ASSET).use { it.readBytes() }
             val config = PlayIntegritySetup.buildDaemonConfig(context)

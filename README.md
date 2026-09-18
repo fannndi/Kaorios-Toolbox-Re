@@ -206,9 +206,22 @@ running `farewelld`). Measured on a real stock surya via `run-as` (app UID) and 
    `settings put` would carry) are written to `/system/etc/farewell/` by the installer, and the
    hook falls back to those files when the Settings row is empty (`ConfigFile`). A rooted user
    keeps live updates: Settings wins when present.
-4. **`farewelld`** is the one genuine root-only piece left (stock mode streams it via `su`);
-   without it the native `ro.boot.*` layer is absent and the Java hook still covers target
-   processes. ROM-integration mode remains the rootless option for that layer.
+4. **System actions run without root when the app is privileged** — the system-app zip grants
+   `REBOOT` (reboot / reboot to recovery), `WRITE_SECURE_SETTINGS` (Apply writes the config
+   directly), `FORCE_STOP_PACKAGES` (`am force-stop` for the DroidGuard refresh) and
+   `CLEAR_APP_USER_DATA` (`pm clear` for the Play Store refresh). `RootShell.forceStop` /
+   `clearData` / `writeSetting` each try the privileged path first, then `su`, then report what
+   the user should do by hand — so a completely unprivileged, unrooted install still degrades
+   gracefully instead of failing silently.
+5. **`farewelld`** is the one genuine root-only piece left in stock mode (it writes the property
+   areas directly, so it cannot be an unprivileged process); without it the native `ro.boot.*`
+   layer is absent and the Java hook still covers target processes. ROM mode
+   (`native/rom/`) remains the rootless option for that layer, but it needs the CIL merged into
+   the ROM's sepolicy at build time — a flashable zip cannot do that, so it stays an opt-in for
+   ROM builders.
+
+The status line shows what the install can do: `... | privileged, root, backup 9, seed 9` — the
+capability list is assembled at status time, so a user can see exactly which layer is active.
 
 Verified end-to-end on the connected surya: with no root and a fabricated seed, the app built
 `Farewell-Patch-surya-miui12-*.zip` — both jars patched (hook present in 3 dex entries), six prop

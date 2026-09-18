@@ -82,11 +82,18 @@ class PatchRepository(private val context: Context) {
         val containsHook = source.patched
         val version = readVersion(probe)
         probe.delete()
-        val store = if (storedStockCount() > 0) ", backup: ${storedStockCount()} files" else ""
+        val capabilities = buildList {
+            if (RootShell.isPrivileged(context, android.Manifest.permission.WRITE_SECURE_SETTINGS)) {
+                add("privileged")
+            }
+            if (RootShell.isRootAvailable()) add("root")
+            if (storedStockCount() > 0) add("backup ${storedStockCount()}")
+            if (seedFileCount() > 0) add("seed ${seedFileCount()}")
+        }.joinToString(", ").ifEmpty { "no extras" }
         if (containsHook) {
-            PatchStatus(RootShell.isRootAvailable(), true, version, "Farewell patch installed (${source.label})$store", device.profile.id)
+            PatchStatus(RootShell.isRootAvailable(), true, version, "Farewell patch installed (${source.label}) | $capabilities", device.profile.id)
         } else {
-            PatchStatus(RootShell.isRootAvailable(), false, null, "Stock framework detected (${source.label})$store", device.profile.id)
+            PatchStatus(RootShell.isRootAvailable(), false, null, "Stock framework detected (${source.label}) | $capabilities", device.profile.id)
         }
     }
 

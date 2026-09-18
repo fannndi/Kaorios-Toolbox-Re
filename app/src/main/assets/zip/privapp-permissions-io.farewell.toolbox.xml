@@ -1,19 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Privileged permission allowlist for the Farewell Toolbox system app.
 
-     The patch zip installs the APK into /system/priv-app and this file into
+     The system-app zip installs the APK into /system/priv-app and this file into
      /system/etc/permissions. The device runs with
      ro.control_privapp_permissions=enforce, so EVERY privileged permission the
      APK declares must be listed here or the platform refuses to boot the
      package. Keep this list in sync with AndroidManifest.xml.
 
-     REBOOT              - reboot / reboot to recovery without root
-     WRITE_SECURE_SETTINGS - write the k2: config blobs without root -->
+     REBOOT                - reboot / reboot to recovery without root
+     WRITE_SECURE_SETTINGS - write the k2: config blobs without root
+     FORCE_STOP_PACKAGES   - `am force-stop` (DroidGuard refresh) without root
+     CLEAR_APP_USER_DATA   - `pm clear` (Play Store refresh) without root -->
 <permissions>
     <privapp-permissions package="io.farewell.toolbox">
         <permission name="android.permission.INTERNET" />
         <permission name="android.permission.RECEIVE_BOOT_COMPLETED" />
         <permission name="android.permission.REBOOT" />
         <permission name="android.permission.WRITE_SECURE_SETTINGS" />
+        <permission name="android.permission.FORCE_STOP_PACKAGES" />
+        <permission name="android.permission.CLEAR_APP_USER_DATA" />
     </privapp-permissions>
 </permissions>

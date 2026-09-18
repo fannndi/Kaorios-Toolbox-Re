@@ -80,7 +80,9 @@ object AutoRefresh {
 
         parts += NativeService.applyStock(context)
 
-        RootShell.run("am force-stop com.google.android.gms.unstable", 30)
+        // Rootless-first force-stop; the job must not fail when neither a
+        // privileged install nor root is available.
+        RootShell.forceStop(context, "com.google.android.gms.unstable")
         return "[$stamp] " + parts.joinToString("; ")
     }
 }
